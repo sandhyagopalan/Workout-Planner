@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Exercise, Workout, Questionnaire, Program, Client } from "../types";
 
@@ -146,13 +147,45 @@ export const recommendProgram = async (client: Client, programs: Program[]): Pro
     const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const programSummaries = programs.map(p => ({ id: p.id, title: p.title, tags: p.tags, duration: p.durationWeeks, description: p.description }));
     
+    // Build rich profile string from new fields
+    const profile = `
+      Name: ${client.name}
+      Goal: ${client.goal}
+      
+      1. FITNESS PROFILE:
+      - Experience: ${client.experienceLevel || 'Intermediate'}
+      - Frequency: ${client.trainingDaysPerWeek || 3} days/week
+      - Equipment: ${client.equipmentAccess ? client.equipmentAccess.join(', ') : 'Standard Gym'}
+      - Age/Gender: ${client.age || 'N/A'} / ${client.gender || 'N/A'}
+      
+      2. HEALTH & RISK:
+      - Injuries: ${client.injuries && client.injuries.length ? client.injuries.join(', ') : 'None'}
+      - Conditions: ${client.medicalConditions && client.medicalConditions.length ? client.medicalConditions.join(', ') : 'None'}
+      - Orthopedic: ${client.orthopedicIssues && client.orthopedicIssues.length ? client.orthopedicIssues.join(', ') : 'None'}
+      
+      3. BEHAVIORAL:
+      - Preferred Style: ${client.trainingStylePreference ? client.trainingStylePreference.join(', ') : 'Mixed'}
+      - Stress Level: ${client.stressLevel || 'Medium'}
+      - Sleep: ${client.sleepQuality || 'Good'}
+    `;
+
     const response = await dynamicAi.models.generateContent({
       model: MODEL_NAME,
-      contents: `Analyze this client profile and recommend the BEST matching program from the available list.
-      Client: Name=${client.name}, Goal=${client.goal}, Status=${client.status}.
-      Available Programs: ${JSON.stringify(programSummaries)}.
+      contents: `Act as an expert personal trainer. Analyze this client profile deeply and recommend the BEST matching program from the available list.
       
-      Return the ID of the best program and a short reasoning (max 2 sentences) explaining why it fits this specific client.`,
+      CLIENT PROFILE:
+      ${profile}
+
+      AVAILABLE PROGRAMS:
+      ${JSON.stringify(programSummaries)}
+      
+      INSTRUCTIONS:
+      1. SAFETY FIRST: Check the Health & Risk layer. (e.g., If 'Low Back Pain', avoid heavy spinal loading programs or warn about them).
+      2. LIFESTYLE MATCH: Check Stress/Sleep. (e.g., High stress/Poor sleep clients should NOT do High Volume/HIIT).
+      3. LOGISTICS: Match Frequency and Equipment.
+      4. GOAL MATCH: Align with primary goal.
+      
+      Return the ID of the best program and a clear, professional reasoning (max 3 sentences) explaining why it fits this specific client's bio-psycho-social profile.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -264,9 +297,9 @@ export const generateExerciseImage = async (exerciseName: string, description: s
 
     const response = await dynamicAi.models.generateContent({
       model: IMAGE_MODEL_NAME,
-      contents: {
-        parts: [{ text: prompt }]
-      }
+      contents: [
+        { parts: [{ text: prompt }] }
+      ]
     });
 
     if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
@@ -297,9 +330,10 @@ export const generateExerciseVideo = async (exerciseName: string, description: s
 
     let operation = await dynamicAi.models.generateVideos({
       model: VIDEO_MODEL_NAME,
-      prompt: `A professional fitness demonstration video of the exercise: ${exerciseName}. 
+      prompt: `Create a short, clear, professional fitness demonstration video of the exercise: ${exerciseName}. 
+      The video must clearly show the correct form and movement pattern.
       Description: ${description}. 
-      Style: Clean, bright gym studio environment. Athletic model, perfect form. 4k resolution. Cinematic lighting.`,
+      Style: Clean, bright gym studio environment. Athletic model in fitness attire. 4k resolution. Cinematic lighting. Minimalist background.`,
       config: {
         numberOfVideos: 1,
         aspectRatio: '16:9',

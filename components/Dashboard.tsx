@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Users, Activity, TrendingUp, DollarSign } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
@@ -31,14 +32,14 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, workouts }) => {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in h-full flex flex-col">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">Overview</h2>
         <span className="text-sm text-slate-500">Last updated: Just now</span>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6">
         <StatCard icon={Users} label="Active Clients" value={activeClients.toString()} change="+12%" color="bg-blue-500" />
         <StatCard icon={Activity} label="Workouts Created" value={workouts.length.toString()} change="+5%" color="bg-indigo-500" />
         <StatCard icon={TrendingUp} label="Completion Rate" value="87%" change="+2.4%" color="bg-emerald-500" />
@@ -46,11 +47,11 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, workouts }) => {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[300px]">
         {/* Activity Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col">
           <h3 className="text-lg font-semibold text-slate-800 mb-4">Weekly Workout Activity</h3>
-          <div className="h-64">
+          <div className="flex-1 w-full min-h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={activityData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -64,9 +65,9 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, workouts }) => {
         </div>
 
         {/* Client Growth Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col">
           <h3 className="text-lg font-semibold text-slate-800 mb-4">Client Growth</h3>
-          <div className="h-64">
+          <div className="flex-1 w-full min-h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={clientGrowthData}>
                 <defs>
@@ -86,7 +87,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, workouts }) => {
         </div>
       </div>
       
-      {/* Recent Actions List - Simplified for demo */}
+      {/* Recent Actions List */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
         <h3 className="text-lg font-semibold text-slate-800 mb-4">Recent Activity</h3>
         <div className="space-y-4">

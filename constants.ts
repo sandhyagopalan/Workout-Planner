@@ -857,7 +857,22 @@ export const MOCK_CLIENTS: Client[] = [
     assignedExercises: [],
     assignedWorkouts: [],
     programStartDate: '2023-10-01',
-    assignedProgramId: 'pg-shred'
+    assignedProgramId: 'pg-shred',
+    age: 34,
+    gender: 'Female',
+    height: 165,
+    weight: 70,
+    experienceLevel: 'Intermediate',
+    trainingDaysPerWeek: 4,
+    injuries: ['Right Knee (Minor)'],
+    medicalConditions: ['Asthma'],
+    medications: 'Inhaler prn',
+    orthopedicIssues: ['Patellar tendonitis'],
+    trainingStylePreference: ['HIIT', 'Strength'],
+    environmentPreference: 'Gym',
+    stressLevel: 'Medium',
+    sleepQuality: 'Good',
+    equipmentAccess: ['Commercial Gym']
   },
   {
     id: 'cl-2',
@@ -871,7 +886,20 @@ export const MOCK_CLIENTS: Client[] = [
     assignedExercises: [
       { id: 'ce-1', exerciseId: 'ex-pullup', assignedDate: '2023-10-25', notes: 'Extra volume requested', completed: false }
     ],
-    assignedWorkouts: []
+    assignedWorkouts: [],
+    age: 28,
+    gender: 'Male',
+    height: 180,
+    weight: 82,
+    bodyFat: 15,
+    experienceLevel: 'Advanced',
+    trainingDaysPerWeek: 5,
+    injuries: [],
+    trainingStylePreference: ['Powerlifting', 'Bodybuilding'],
+    environmentPreference: 'Home',
+    stressLevel: 'High',
+    sleepQuality: 'Fair',
+    equipmentAccess: ['Home Gym']
   },
   {
     id: 'cl-3',
@@ -881,6 +909,21 @@ export const MOCK_CLIENTS: Client[] = [
     goal: 'General Fitness',
     lastActive: 'N/A',
     assignedExercises: [],
-    assignedWorkouts: []
+    assignedWorkouts: [],
+    age: 45,
+    gender: 'Female',
+    height: 162,
+    weight: 65,
+    experienceLevel: 'Beginner',
+    trainingDaysPerWeek: 3,
+    injuries: ['Lower Back'],
+    orthopedicIssues: ['L4-L5 disc bulge'],
+    medicalConditions: ['High Blood Pressure'],
+    doctorClearance: true,
+    trainingStylePreference: ['Low Impact', 'Yoga', 'Bodyweight'],
+    environmentPreference: 'Home',
+    stressLevel: 'Low',
+    sleepQuality: 'Poor',
+    equipmentAccess: ['Dumbbells', 'Bands']
   }
 ];

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Sparkles, Loader2, X, Image as ImageIcon, Filter, ChevronLeft, ChevronRight, Maximize2, Info, RefreshCw, Video } from 'lucide-react';
+import { Plus, Search, Sparkles, Loader2, X, Image as ImageIcon, Filter, ChevronLeft, ChevronRight, Maximize2, Info, RefreshCw, Video, Dumbbell } from 'lucide-react';
 import { Exercise, MuscleGroup, Difficulty } from '../types';
 import { generateNewExercise, generateExerciseImage, generateExerciseVideo } from '../services/geminiService';
 
@@ -507,7 +507,7 @@ const Exercises: React.FC<ExercisesProps> = ({ exercises, setExercises, isLoadin
                                 className="flex items-center gap-2 bg-slate-900 px-4 py-2 rounded-xl shadow-lg text-white font-bold hover:scale-105 transition-transform active:scale-95 disabled:opacity-50 text-sm"
                             >
                                 {isGeneratingVideo ? <Loader2 className="animate-spin" size={16}/> : <Video size={16} />}
-                                <span>{isGeneratingVideo ? 'Generating Video...' : 'Generate Video'}</span>
+                                <span>{isGeneratingVideo ? 'Generating Video...' : 'Generate AI Video'}</span>
                             </button>
                        </div>
 

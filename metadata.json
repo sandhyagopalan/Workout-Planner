@@ -1,5 +1,7 @@
 {
   "name": "FitPro AI Admin",
   "description": "A comprehensive B2B administration dashboard for personal trainers to manage clients, create AI-powered workouts, track progress, and design programs.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }

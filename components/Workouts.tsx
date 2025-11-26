@@ -78,6 +78,23 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
 
+  // Related Exercises Logic for Builder
+  const suggestedExercises = useMemo(() => {
+      if (builderExercises.length === 0) return [];
+      
+      // Get the last added exercise to contextualize suggestions
+      const lastEx = exercises.find(e => e.id === builderExercises[builderExercises.length - 1].exerciseId);
+      if (!lastEx) return [];
+
+      // Find unselected exercises with same muscle group
+      const addedIds = new Set(builderExercises.map(be => be.exerciseId));
+      
+      return exercises
+        .filter(e => e.muscleGroup === lastEx.muscleGroup && !addedIds.has(e.id))
+        .sort(() => 0.5 - Math.random()) // Shuffle
+        .slice(0, 4); // Top 4
+  }, [builderExercises, exercises]);
+
   // ... (Duration Estimation Logic remains same) ...
   const estimatedDuration = useMemo(() => {
     if (builderExercises.length === 0) return 0;
@@ -271,6 +288,24 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
     }
   };
 
+  const handleRunAuditForView = async () => {
+      if (!viewingWorkout) return;
+      setIsAuditing(true);
+      setShowAudit(true);
+      try {
+          const exerciseNames = viewingWorkout.exercises.map(ex => {
+              const def = exercises.find(e => e.id === ex.exerciseId);
+              return { name: def?.name || 'Unknown', sets: ex.sets, reps: ex.reps };
+          });
+          const result = await analyzeWorkoutPlan(viewingWorkout.title, exerciseNames);
+          setAuditResult(result);
+      } catch (e) {
+          alert("Failed to audit workout");
+      } finally {
+          setIsAuditing(false);
+      }
+  };
+
   const handleRunAudit = async () => {
       if (builderExercises.length === 0) return;
       setIsAuditing(true);
@@ -310,11 +345,54 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
       setExpandedInstructions(newSet); 
   }
   
+  // Reusable Audit Panel Component
+  const renderAuditPanel = () => {
+      if (!showAudit) return null;
+      return (
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 mb-6 text-white shadow-xl animate-in fade-in slide-in-from-top-4 w-full">
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/10 rounded-lg"><Sparkles size={24} className="text-yellow-400" /></div>
+                    <div><h3 className="font-bold text-lg">AI Workout Auditor</h3><p className="text-slate-400 text-sm">Analyzing balance and intensity...</p></div>
+                </div>
+                <button onClick={() => setShowAudit(false)} className="text-slate-400 hover:text-white"><X size={20}/></button>
+            </div>
+
+            {isAuditing ? (
+                <div className="py-8 flex flex-col items-center justify-center text-slate-300">
+                    <Loader2 size={32} className="animate-spin mb-2 text-indigo-400" />
+                    <p>Reviewing exercise selection...</p>
+                </div>
+            ) : auditResult ? (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="text-center p-4 bg-white/5 rounded-xl border border-white/10">
+                        <div className="text-4xl font-bold text-emerald-400 mb-1">{auditResult.score}</div>
+                        <div className="text-xs uppercase font-bold tracking-wider text-slate-400">Quality Score</div>
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-bold text-emerald-300 uppercase mb-2 flex items-center gap-2"><CheckSquare size={14}/> Strengths</h4>
+                        <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4">{auditResult.pros.map((p,i)=><li key={i}>{p}</li>)}</ul>
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-bold text-orange-300 uppercase mb-2 flex items-center gap-2"><AlertCircle size={14}/> Potential Issues</h4>
+                        <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4">{auditResult.cons.map((c,i)=><li key={i}>{c}</li>)}</ul>
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-bold text-blue-300 uppercase mb-2 flex items-center gap-2"><Wand2 size={14}/> Suggestions</h4>
+                        <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4">{auditResult.suggestions.map((s,i)=><li key={i}>{s}</li>)}</ul>
+                    </div>
+                </div>
+            ) : null}
+        </div>
+      );
+  };
+
   const renderDetailView = () => {
       if (!viewingWorkout) return null;
       return (
-        <div className="space-y-6 animate-fade-in pb-10">
-             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><div className="flex items-center gap-4"><button onClick={() => { setViewingWorkout(null); setView('list'); }} className="p-3 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"><ArrowLeft size={24} /></button><div><div className="flex items-center gap-2 mb-1"><span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700">{viewingWorkout.type}</span><span className="text-slate-300">•</span><span className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> {viewingWorkout.durationMinutes} mins</span></div><h2 className="text-3xl font-bold text-slate-800 leading-tight">{viewingWorkout.title}</h2><p className="text-slate-500 mt-1">{viewingWorkout.description}</p></div></div><button onClick={(e) => handleEditWorkout(e, viewingWorkout)} className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-transform hover:scale-105 shadow-lg shadow-indigo-200"><Edit2 size={18} /> Edit Plan</button></div>
+        <div className="space-y-6 animate-fade-in pb-10 w-full">
+             {renderAuditPanel()}
+             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><div className="flex items-center gap-4"><button onClick={() => { setViewingWorkout(null); setView('list'); setShowAudit(false); }} className="p-3 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"><ArrowLeft size={24} /></button><div><div className="flex items-center gap-2 mb-1"><span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700">{viewingWorkout.type}</span><span className="text-slate-300">•</span><span className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> {viewingWorkout.durationMinutes} mins</span></div><h2 className="text-3xl font-bold text-slate-800 leading-tight">{viewingWorkout.title}</h2><p className="text-slate-500 mt-1">{viewingWorkout.description}</p></div></div><div className="flex items-center gap-3"><button onClick={handleRunAuditForView} className="flex items-center gap-2 px-4 py-3 bg-purple-50 text-purple-700 rounded-xl font-bold hover:bg-purple-100 transition-colors border border-purple-100"><Sparkles size={18}/> AI Audit</button><button onClick={(e) => handleEditWorkout(e, viewingWorkout)} className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-transform hover:scale-105 shadow-lg shadow-indigo-200"><Edit2 size={18} /> Edit Plan</button></div></div>
              <div className="space-y-4">
                 {viewingWorkout.exercises.map((ex, i) => {
                     const def = exercises.find(e => e.id === ex.exerciseId);
@@ -375,12 +453,12 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
       return renderDetailView() || <div />; 
   }
   if (view === 'templates') return (
-    <div className="space-y-6 animate-fade-in pb-10">
+    <div className="space-y-6 animate-fade-in pb-10 w-full">
         <div className="flex items-center gap-4 mb-6">
             <button onClick={() => setView('list')} className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors"><ArrowLeft size={20} /></button>
             <h2 className="text-2xl font-bold text-slate-800">Workout Templates</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
             {WORKOUT_TEMPLATES.map((t, i) => (
                 <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all">
                     <div className="h-40 bg-slate-200 relative">
@@ -434,9 +512,9 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
 
   if (view === 'builder') {
     return (
-        <div className="h-[calc(100vh-6rem)] flex flex-col animate-fade-in">
+        <div className="h-full flex flex-col animate-fade-in flex-1">
             {/* Builder Header */}
-            <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex-shrink-0">
                 <div className="flex items-center gap-4">
                     <button onClick={() => { setView('list'); setEditingWorkoutId(null); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"><ArrowLeft size={20} /></button>
                     <div><h2 className="text-xl font-bold text-slate-800">{editingWorkoutId ? 'Edit Workout' : 'Workout Builder'}</h2></div>
@@ -453,60 +531,42 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
             </div>
 
             {/* AI Audit Panel (Collapsible) */}
-            {showAudit && (
-                <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 mb-6 text-white shadow-xl animate-in fade-in slide-in-from-top-4">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-white/10 rounded-lg"><Sparkles size={24} className="text-yellow-400" /></div>
-                            <div><h3 className="font-bold text-lg">AI Workout Auditor</h3><p className="text-slate-400 text-sm">Analyzing balance and intensity...</p></div>
-                        </div>
-                        <button onClick={() => setShowAudit(false)} className="text-slate-400 hover:text-white"><X size={20}/></button>
-                    </div>
+            {renderAuditPanel()}
 
-                    {isAuditing ? (
-                        <div className="py-8 flex flex-col items-center justify-center text-slate-300">
-                            <Loader2 size={32} className="animate-spin mb-2 text-indigo-400" />
-                            <p>Reviewing exercise selection...</p>
-                        </div>
-                    ) : auditResult ? (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                            <div className="text-center p-4 bg-white/5 rounded-xl border border-white/10">
-                                <div className="text-4xl font-bold text-emerald-400 mb-1">{auditResult.score}</div>
-                                <div className="text-xs uppercase font-bold tracking-wider text-slate-400">Quality Score</div>
-                            </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-emerald-300 uppercase mb-2 flex items-center gap-2"><CheckSquare size={14}/> Strengths</h4>
-                                <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4">{auditResult.pros.map((p,i)=><li key={i}>{p}</li>)}</ul>
-                            </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-orange-300 uppercase mb-2 flex items-center gap-2"><AlertCircle size={14}/> Potential Issues</h4>
-                                <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4">{auditResult.cons.map((c,i)=><li key={i}>{c}</li>)}</ul>
-                            </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-blue-300 uppercase mb-2 flex items-center gap-2"><Wand2 size={14}/> Suggestions</h4>
-                                <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4">{auditResult.suggestions.map((s,i)=><li key={i}>{s}</li>)}</ul>
-                            </div>
-                        </div>
-                    ) : null}
-                </div>
-            )}
-
-            <div className="flex-1 flex gap-6 overflow-hidden">
+            <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
                 {/* Left: Library */}
-                <div className="w-1/3 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col">
-                    <div className="p-4 border-b border-slate-100"><input type="text" placeholder="Search exercises..." className="w-full p-2 border rounded" value={exerciseSearch} onChange={e=>setExerciseSearch(e.target.value)}/></div>
+                <div className="w-1/3 min-w-[300px] bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 flex-shrink-0"><input type="text" placeholder="Search exercises..." className="w-full p-2 border rounded" value={exerciseSearch} onChange={e=>setExerciseSearch(e.target.value)}/></div>
+                    
+                    {/* NEW: Smart Suggestions Panel */}
+                    {suggestedExercises.length > 0 && !exerciseSearch && (
+                        <div className="p-3 bg-indigo-50 border-b border-indigo-100 flex-shrink-0">
+                            <div className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                <Sparkles size={12} /> Suggested for you
+                            </div>
+                            <div className="space-y-1">
+                                {suggestedExercises.map(ex => (
+                                    <button key={ex.id} onClick={() => handleAddExerciseToBuilder(ex)} className="w-full text-left p-2 hover:bg-white rounded border border-transparent hover:border-indigo-200 flex justify-between group transition-all text-xs">
+                                        <span className="font-medium text-indigo-900">{ex.name}</span>
+                                        <Plus size={14} className="text-indigo-400 group-hover:text-indigo-600"/>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex-1 overflow-y-auto p-2 space-y-2">{exercises.filter(e=>e.name.toLowerCase().includes(exerciseSearch.toLowerCase())).map(ex => (<button key={ex.id} onClick={() => handleAddExerciseToBuilder(ex)} className="w-full text-left p-3 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 flex justify-between group"><span className="font-medium text-slate-700 group-hover:text-indigo-700">{ex.name}</span><Plus size={16} className="text-slate-300 group-hover:text-indigo-600"/></button>))}</div>
                 </div>
 
                 {/* Right: Builder */}
-                <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col">
-                    <div className="p-6 border-b border-slate-100 bg-slate-50 space-y-4">
+                <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 bg-slate-50 space-y-4 flex-shrink-0">
                          <div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-slate-500 uppercase">Title</label><input type="text" className="w-full p-2 border rounded font-bold" value={builderTitle} onChange={e=>setBuilderTitle(e.target.value)} /></div><div className="w-40"><label className="text-xs font-bold text-slate-500 uppercase">Type</label><select className="w-full p-2 border rounded bg-white" value={builderType} onChange={e=>setBuilderType(e.target.value)}><option>Strength</option><option>Hypertrophy</option></select></div></div>
                          <div><label className="text-xs font-bold text-slate-500 uppercase">Description</label><input type="text" className="w-full p-2 border rounded" value={builderDesc} onChange={e=>setBuilderDesc(e.target.value)} /></div>
                     </div>
                     
                     {/* Toolbar */}
-                    <div className="flex items-center justify-between p-3 bg-slate-50 border-b border-slate-200">
+                    <div className="flex items-center justify-between p-3 bg-slate-50 border-b border-slate-200 flex-shrink-0">
                         <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Exercise Order</h4>
                         <div className="flex gap-2">
                             <button 
@@ -606,7 +666,7 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
 
   // List View (Default)
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-10 w-full">
         {/* ... Header ... */}
         <div className="flex justify-between items-center"><div><h2 className="text-2xl font-bold text-slate-800">Workouts</h2></div><div className="flex gap-3"><button onClick={handleCreateNew} className="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"><Plus size={18}/> Create New</button></div></div>
 
@@ -650,7 +710,7 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredWorkouts.map(w => (
                 <div key={w.id} onClick={() => { setViewingWorkout(w); setView('detail'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md cursor-pointer overflow-hidden">
                     <div className="h-40 bg-slate-200 relative"><img src={w.image} className="w-full h-full object-cover" alt={w.title}/><div className="absolute top-3 left-3"><span className="px-2 py-1 bg-white/90 text-indigo-600 text-xs font-bold rounded">{w.type}</span></div></div>

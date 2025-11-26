@@ -77,6 +77,12 @@ export interface ClientWorkout {
   exercises: WorkoutExercise[]; // Snapshot of exercises for customization
 }
 
+export interface WorkoutLog {
+  date: string;
+  workoutId: string;
+  logs: Record<string, { weight: string; reps: string; completed: boolean }[]>;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -86,8 +92,38 @@ export interface Client {
   programStartDate?: string; // ISO Date string YYYY-MM-DD
   assignedExercises?: ClientExercise[]; // Ad-hoc exercises
   assignedWorkouts?: ClientWorkout[]; // Ad-hoc or customized workouts
+  workoutLogs?: WorkoutLog[]; // History of completed workouts
   lastActive?: string;
-  goal: string;
+  onboardingComplete?: boolean; // Flag to trigger B2C intake flow
+  
+  // --- 1. Core Fitness Profile ---
+  goal: string; // Primary Goal
+  experienceLevel?: 'Beginner' | 'Intermediate' | 'Advanced';
+  trainingDaysPerWeek?: number;
+  equipmentAccess?: string[]; // Gym, Home, Bands, etc.
+  age?: number;
+  gender?: string;
+  height?: number; // cm
+  weight?: number; // kg
+  bodyFat?: number; // %
+
+  // --- 2. Health + Risk Check ---
+  injuries?: string[];
+  medicalConditions?: string[]; // Diabetes, High BP, Asthma
+  orthopedicIssues?: string[]; // Knee pain, Back pain
+  surgeries?: string; // "ACL repair 2020"
+  medications?: string; 
+  doctorClearance?: boolean;
+
+  // --- 3. Behavioral + Personalization ---
+  trainingStylePreference?: string[]; // HIIT, Bodyweight, Yoga
+  environmentPreference?: 'Gym' | 'Home' | 'Outdoor';
+  stressLevel?: 'Low' | 'Medium' | 'High';
+  sleepQuality?: 'Poor' | 'Fair' | 'Good';
+  timeOfDay?: 'Morning' | 'Afternoon' | 'Evening';
+  
+  // General
+  notes?: string; 
 }
 
 export interface Questionnaire {
@@ -103,4 +139,5 @@ export interface Question {
   options?: string[]; // for select
 }
 
-export type ViewState = 'dashboard' | 'clients' | 'exercises' | 'workouts' | 'programs' | 'questionnaires';
+export type ViewState = 'dashboard' | 'clients' | 'exercises' | 'workouts' | 'programs' | 'questionnaires' | 'wrkout-library';
+export type AppMode = 'admin' | 'client';

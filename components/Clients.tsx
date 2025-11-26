@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Client, Program, Workout, Exercise, ClientExercise, WorkoutExercise, ClientWorkout } from '../types';
-import { Mail, MoreHorizontal, Search, UserPlus, ShieldCheck, ArrowLeft, Calendar, Clock, Trophy, CheckCircle2, PlusCircle, X, Dumbbell, ChevronLeft, ChevronRight, LayoutGrid, List, CalendarDays, Info, Timer, Edit2, Save, Sparkles, Loader2 } from 'lucide-react';
+import { Mail, MoreHorizontal, Search, UserPlus, ShieldCheck, ArrowLeft, Calendar, Clock, Trophy, CheckCircle2, PlusCircle, X, Dumbbell, ChevronLeft, ChevronRight, LayoutGrid, List, CalendarDays, Info, Timer, Edit2, Save, Sparkles, Loader2, FileText, User, Activity, CalendarCheck, AlertCircle, HeartPulse, Brain, Gauge, Scale } from 'lucide-react';
 import { recommendProgram } from '../services/geminiService';
 
 interface ClientsProps {
@@ -28,6 +28,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
   // Modal States
   const [showAssignProgramModal, setShowAssignProgramModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [assignType, setAssignType] = useState<'exercise' | 'workout'>('exercise');
   
   // AI Recommendation State
@@ -53,6 +54,9 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
   const [assignmentSets, setAssignmentSets] = useState('3');
   const [assignmentReps, setAssignmentReps] = useState('10');
 
+  // Profile Edit Form
+  const [editProfileData, setEditProfileData] = useState<Partial<Client>>({});
+
   const filteredClients = clients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -77,6 +81,12 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
 
   const getExerciseName = (id: string) => {
     return exercises.find(e => e.id === id)?.name || 'Unknown Exercise';
+  };
+
+  const calculateBMI = (height?: number, weight?: number) => {
+      if (!height || !weight) return null;
+      const heightM = height / 100;
+      return (weight / (heightM * heightM)).toFixed(1);
   };
 
   const getCalendarDays = () => {
@@ -200,10 +210,12 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
 
   const handleAssignProgram = (programId: string) => {
     if (!selectedClientId) return;
+    const startDate = programStartDateInput || new Date().toISOString().split('T')[0];
     setClients(prev => prev.map(c => 
-      c.id === selectedClientId ? { ...c, assignedProgramId: programId, programStartDate: programStartDateInput } : c
+      c.id === selectedClientId ? { ...c, assignedProgramId: programId, programStartDate: startDate } : c
     ));
     setShowAssignProgramModal(false);
+    setAiRecommendation(null); // Clear recommendation after assignment
   };
 
   const handleOpenAssignModal = (dateStr: string, type: 'exercise' | 'workout') => {
@@ -262,7 +274,18 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
     setShowAssignModal(false);
   };
 
-  // ... (Existing Handlers: handleOpenViewItem, handleSaveWorkoutChanges, updateEditedExercise etc. keep same logic)
+  const handleOpenEditProfile = () => {
+      if (!selectedClient) return;
+      setEditProfileData({ ...selectedClient });
+      setShowEditProfileModal(true);
+  };
+
+  const handleSaveProfile = () => {
+      if (!selectedClientId) return;
+      setClients(prev => prev.map(c => c.id === selectedClientId ? { ...c, ...editProfileData } : c));
+      setShowEditProfileModal(false);
+  };
+
   const handleOpenViewItem = (item: CalendarItem, date: string) => {
       setViewingItem({ item, date });
       setIsEditingWorkout(false);
@@ -317,6 +340,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
   // --- Render ---
   if (selectedClient) {
     const activeProgram = programs.find(p => p.id === selectedClient.assignedProgramId);
+    const bmi = calculateBMI(selectedClient.height, selectedClient.weight);
     
     return (
       <div className="space-y-6 animate-fade-in pb-10">
@@ -342,12 +366,154 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
 
         {activeTab === 'overview' && (
             <div className="animate-fade-in space-y-6">
+                {/* Quick Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {/* ... Stats Cards ... */}
                     <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Goal</div><div className="flex items-center gap-2 text-indigo-600"><Trophy size={16} /><span className="font-semibold">{selectedClient.goal}</span></div></div>
                     <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Program Status</div><div className="flex items-center gap-2 text-emerald-600"><ShieldCheck size={16} /><span className="font-semibold truncate">{activeProgram ? `Week 2 of ${activeProgram.durationWeeks}` : 'None'}</span></div></div>
                     <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Compliance</div><div className="flex items-center gap-2 text-slate-700"><CheckCircle2 size={16} /><span className="font-semibold">92%</span></div></div>
                     <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Last Active</div><div className="flex items-center gap-2 text-slate-700"><Clock size={16} /><span className="font-semibold">{selectedClient.lastActive || 'Never'}</span></div></div>
+                </div>
+
+                {/* RICH PROFILE GRID */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Column 1: Core & Bio */}
+                    <div className="lg:col-span-1 space-y-6">
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-slate-800 flex items-center gap-2"><User size={18} className="text-slate-400"/> Fitness Profile</h3>
+                                <button onClick={handleOpenEditProfile} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline">Edit</button>
+                            </div>
+                            <div className="space-y-3 text-sm">
+                                <div><div className="text-slate-400 text-xs">Primary Goal</div><div className="font-medium text-indigo-600">{selectedClient.goal}</div></div>
+                                <div className="grid grid-cols-2 gap-4 py-2 border-b border-slate-50">
+                                    <div><div className="text-slate-400 text-xs">Age</div><div className="font-medium">{selectedClient.age || '-'}</div></div>
+                                    <div><div className="text-slate-400 text-xs">Gender</div><div className="font-medium">{selectedClient.gender || '-'}</div></div>
+                                    <div><div className="text-slate-400 text-xs">Height</div><div className="font-medium">{selectedClient.height ? `${selectedClient.height}cm` : '-'}</div></div>
+                                    <div><div className="text-slate-400 text-xs">Weight</div><div className="font-medium">{selectedClient.weight ? `${selectedClient.weight}kg` : '-'}</div></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 py-2 border-b border-slate-50 bg-slate-50/50 rounded p-2">
+                                    <div><div className="text-slate-400 text-xs">BMI</div><div className="font-medium">{bmi || '-'}</div></div>
+                                    <div><div className="text-slate-400 text-xs">Body Fat</div><div className="font-medium">{selectedClient.bodyFat ? `${selectedClient.bodyFat}%` : '-'}</div></div>
+                                </div>
+                                <div><div className="text-slate-400 text-xs">Experience Level</div><div className="font-medium">{selectedClient.experienceLevel || 'Beginner'}</div></div>
+                                <div><div className="text-slate-400 text-xs">Availability</div><div className="font-medium">{selectedClient.trainingDaysPerWeek || 3} Days / Week</div></div>
+                                <div>
+                                    <div className="text-slate-400 text-xs mb-1">Equipment Access</div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {selectedClient.equipmentAccess?.length ? selectedClient.equipmentAccess.map(e => <span key={e} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200">{e}</span>) : <span className="text-slate-400 italic">Not specified</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4"><Brain size={18} className="text-purple-400"/> Behavioral & Lifestyle</h3>
+                            <div className="space-y-3 text-sm">
+                                <div><div className="text-slate-400 text-xs">Stress Level</div><div className={`font-medium ${selectedClient.stressLevel === 'High' ? 'text-red-500' : 'text-slate-700'}`}>{selectedClient.stressLevel || '-'}</div></div>
+                                <div><div className="text-slate-400 text-xs">Sleep Quality</div><div className="font-medium">{selectedClient.sleepQuality || '-'}</div></div>
+                                <div><div className="text-slate-400 text-xs mb-1">Preferred Style</div><div className="text-slate-700">{selectedClient.trainingStylePreference?.join(', ') || 'Any'}</div></div>
+                                <div><div className="text-slate-400 text-xs">Environment</div><div className="font-medium">{selectedClient.environmentPreference || 'Any'}</div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Column 2: Health & AI */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4"><HeartPulse size={18} className="text-red-400"/> Health & Safety Check</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Injuries & Orthopedic</span>
+                                    {selectedClient.injuries?.length || selectedClient.orthopedicIssues?.length ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedClient.injuries?.map(i => <span key={i} className="px-2 py-1 bg-red-50 text-red-600 border border-red-100 rounded text-xs font-medium flex items-center gap-1"><AlertCircle size={10}/> {i}</span>)}
+                                            {selectedClient.orthopedicIssues?.map(i => <span key={i} className="px-2 py-1 bg-orange-50 text-orange-600 border border-orange-100 rounded text-xs font-medium">{i}</span>)}
+                                        </div>
+                                    ) : <span className="text-sm text-slate-400 italic">No reported issues</span>}
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Medical Conditions</span>
+                                    {selectedClient.medicalConditions?.length ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedClient.medicalConditions.map(c => <span key={c} className="px-2 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded text-xs font-medium">{c}</span>)}
+                                        </div>
+                                    ) : <span className="text-sm text-slate-400 italic">None reported</span>}
+                                </div>
+                            </div>
+                            {(selectedClient.surgeries || selectedClient.medications) && (
+                                <div className="mt-4 pt-4 border-t border-slate-50 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    {selectedClient.surgeries && <div><span className="text-slate-400 text-xs block">Surgeries</span><span className="text-slate-700">{selectedClient.surgeries}</span></div>}
+                                    {selectedClient.medications && <div><span className="text-slate-400 text-xs block">Medications</span><span className="text-slate-700">{selectedClient.medications}</span></div>}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* AI Matchmaker */}
+                        <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100 shadow-sm p-6">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                                        <Sparkles size={20} className="text-indigo-600"/>
+                                        AI Program Matchmaker
+                                    </h3>
+                                    <p className="text-sm text-indigo-700 mt-1">
+                                        Analyzes <strong>Goals, Health Risks, and Lifestyle</strong> to find the safest fit.
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={handleGetAiRecommendation}
+                                    disabled={isRecommending}
+                                    className="px-4 py-2 bg-white text-indigo-600 font-bold rounded-lg shadow-sm border border-indigo-100 hover:bg-indigo-50 disabled:opacity-70 flex items-center gap-2 transition-colors"
+                                >
+                                    {isRecommending ? <Loader2 className="animate-spin" size={16}/> : <Sparkles size={16}/>}
+                                    Run Analysis
+                                </button>
+                            </div>
+
+                            {aiRecommendation ? (
+                                <div className="bg-white rounded-xl p-4 border border-indigo-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                                    <div className="flex gap-4">
+                                        <div className="w-24 h-24 bg-slate-100 rounded-lg shrink-0 overflow-hidden hidden sm:block relative">
+                                            {programs.find(p => p.id === aiRecommendation.id)?.image ? (
+                                                <img src={programs.find(p => p.id === aiRecommendation.id)?.image} className="w-full h-full object-cover" alt="Program Cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-300"><ShieldCheck size={32} /></div>
+                                            )}
+                                            <div className="absolute inset-0 bg-indigo-900/10"></div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className="font-bold text-slate-800 text-lg">{programs.find(p => p.id === aiRecommendation.id)?.title || 'Unknown Program'}</h4>
+                                                        <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Best Match</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 mt-1">
+                                                        {programs.find(p => p.id === aiRecommendation.id)?.durationWeeks} Weeks • {programs.find(p => p.id === aiRecommendation.id)?.tags?.join(', ') || 'General'}
+                                                    </p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => handleAssignProgram(aiRecommendation.id)}
+                                                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all whitespace-nowrap"
+                                                >
+                                                    Assign Program
+                                                </button>
+                                            </div>
+                                            <div className="mt-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-sm text-indigo-800 italic flex gap-2 items-start">
+                                                <Sparkles size={14} className="mt-0.5 shrink-0 opacity-70" />
+                                                <span className="leading-relaxed">{aiRecommendation.reason}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-32 text-center text-indigo-300 border-2 border-dashed border-indigo-100 rounded-xl bg-white/50">
+                                    <Gauge size={24} className="mb-2 opacity-50"/>
+                                    <span className="text-sm font-medium">Ready to analyze client profile</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         )}
@@ -444,6 +610,106 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
             </div>
         )}
 
+        {/* RICH EDIT PROFILE MODAL */}
+        {showEditProfileModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <div>
+                            <h3 className="text-xl font-bold text-slate-800">Edit Client Profile</h3>
+                            <p className="text-xs text-slate-500">Detailed info helps AI make safer recommendations.</p>
+                        </div>
+                        <button onClick={() => setShowEditProfileModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                    </div>
+                    <div className="p-6 overflow-y-auto">
+                        <div className="space-y-8">
+                            {/* Section 1: Core */}
+                            <div>
+                                <h4 className="text-sm font-bold text-indigo-700 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><User size={16}/> Core Metrics</h4>
+                                <div className="mb-4">
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">Primary Goal</label>
+                                    <input type="text" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.goal || ''} onChange={e => setEditProfileData({...editProfileData, goal: e.target.value})} />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Age</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.age || ''} onChange={e => setEditProfileData({...editProfileData, age: parseInt(e.target.value)})} /></div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Gender</label>
+                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.gender || ''} onChange={e => setEditProfileData({...editProfileData, gender: e.target.value})}>
+                                            <option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Height (cm)</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.height || ''} onChange={e => setEditProfileData({...editProfileData, height: parseInt(e.target.value)})} /></div>
+                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Weight (kg)</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.weight || ''} onChange={e => setEditProfileData({...editProfileData, weight: parseInt(e.target.value)})} /></div>
+                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Body Fat (%)</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.bodyFat || ''} onChange={e => setEditProfileData({...editProfileData, bodyFat: parseInt(e.target.value)})} /></div>
+                                    <div className="md:col-span-1">
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Experience Level</label>
+                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.experienceLevel || 'Beginner'} onChange={e => setEditProfileData({...editProfileData, experienceLevel: e.target.value as any})}>
+                                            <option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section 2: Health & Safety */}
+                            <div>
+                                <h4 className="text-sm font-bold text-red-600 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><HeartPulse size={16}/> Health & Safety</h4>
+                                <div className="space-y-4">
+                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Injuries (Comma separated)</label><input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. Rotator cuff, ACL tear" value={editProfileData.injuries ? editProfileData.injuries.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, injuries: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} /></div>
+                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Orthopedic Issues (e.g. Back Pain, Knee Pain)</label><input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. Lower back stiffness, Knee crepitus" value={editProfileData.orthopedicIssues ? editProfileData.orthopedicIssues.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, orthopedicIssues: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} /></div>
+                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Medical Conditions</label><input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. Diabetes, Asthma, High BP" value={editProfileData.medicalConditions ? editProfileData.medicalConditions.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, medicalConditions: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} /></div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><label className="block text-xs font-medium text-slate-700 mb-1">Surgeries</label><input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="Year and type..." value={editProfileData.surgeries || ''} onChange={e => setEditProfileData({...editProfileData, surgeries: e.target.value})} /></div>
+                                        <div><label className="block text-xs font-medium text-slate-700 mb-1">Medications</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.medications || ''} onChange={e => setEditProfileData({...editProfileData, medications: e.target.value})} /></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section 3: Lifestyle & Behavior */}
+                            <div>
+                                <h4 className="text-sm font-bold text-purple-600 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><Brain size={16}/> Lifestyle & Behavior</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Stress Level</label>
+                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.stressLevel || 'Medium'} onChange={e => setEditProfileData({...editProfileData, stressLevel: e.target.value as any})}>
+                                            <option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Sleep Quality</label>
+                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.sleepQuality || 'Fair'} onChange={e => setEditProfileData({...editProfileData, sleepQuality: e.target.value as any})}>
+                                            <option value="Poor">Poor</option><option value="Fair">Fair</option><option value="Good">Good</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Environment Pref</label>
+                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.environmentPreference || 'Gym'} onChange={e => setEditProfileData({...editProfileData, environmentPreference: e.target.value as any})}>
+                                            <option value="Gym">Gym</option><option value="Home">Home</option><option value="Outdoor">Outdoor</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Training Frequency</label>
+                                        <input type="number" min="1" max="7" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.trainingDaysPerWeek || 3} onChange={e => setEditProfileData({...editProfileData, trainingDaysPerWeek: parseInt(e.target.value)})} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">Training Styles (Comma separated)</label>
+                                    <input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. HIIT, Bodyweight, Yoga" value={editProfileData.trainingStylePreference ? editProfileData.trainingStylePreference.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, trainingStylePreference: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} />
+                                </div>
+                                <div className="mt-4">
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">Equipment Access</label>
+                                    <input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. Gym, Dumbbells, Bands" value={editProfileData.equipmentAccess ? editProfileData.equipmentAccess.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, equipmentAccess: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                        <button onClick={() => setShowEditProfileModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
+                        <button onClick={handleSaveProfile} className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700">Save Profile</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* MODAL: Assign Program (WITH AI) */}
         {showAssignProgramModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -453,29 +719,6 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
                         <button onClick={() => setShowAssignProgramModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
                     </div>
                     <div className="p-6 max-h-[70vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-sm text-slate-500 uppercase font-bold tracking-wider">Available Programs</h4>
-                            <button 
-                                onClick={handleGetAiRecommendation}
-                                disabled={isRecommending}
-                                className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-lg transition-all disabled:opacity-70"
-                            >
-                                {isRecommending ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                                AI Recommend
-                            </button>
-                        </div>
-
-                        {/* Recommendation Card */}
-                        {aiRecommendation && (
-                            <div className="mb-6 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 rounded-xl border border-indigo-100 animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center gap-2 mb-2 text-indigo-700 font-bold text-sm">
-                                    <Sparkles size={14} />
-                                    Recommended Match
-                                </div>
-                                <p className="text-sm text-slate-700 leading-relaxed">{aiRecommendation.reason}</p>
-                            </div>
-                        )}
-
                         <div className="mb-6">
                             <label className="block text-sm font-medium text-slate-700 mb-2">Start Date</label>
                             <input 
@@ -488,17 +731,15 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
 
                         <div className="space-y-3">
                             {programs.map(prog => {
-                                const isRecommended = aiRecommendation?.id === prog.id;
                                 return (
                                     <button 
                                         key={prog.id}
                                         onClick={() => handleAssignProgram(prog.id)}
-                                        className={`w-full text-left p-4 rounded-xl border transition-all flex justify-between items-center group ${isRecommended ? 'border-indigo-500 ring-2 ring-indigo-200 bg-indigo-50' : (selectedClient.assignedProgramId === prog.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300 hover:shadow-md')}`}
+                                        className={`w-full text-left p-4 rounded-xl border transition-all flex justify-between items-center group ${selectedClient.assignedProgramId === prog.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300 hover:shadow-md'}`}
                                     >
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <h4 className={`font-bold ${selectedClient.assignedProgramId === prog.id ? 'text-indigo-700' : 'text-slate-800'}`}>{prog.title}</h4>
-                                                {isRecommended && <span className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><Sparkles size={8}/> BEST FIT</span>}
                                             </div>
                                             <p className="text-xs text-slate-500 mt-1">{prog.durationWeeks} Weeks • {prog.description}</p>
                                         </div>
