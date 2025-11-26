@@ -11,7 +11,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CHEST,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Barbell', 'Bench'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Barbell%20Bench%20Press/0.jpg' 
+    videoUrl: 'https://media.giphy.com/media/24FK490Fj6O5i5r9o0/giphy.gif' 
   },
   {
     id: 'ex-inc-bp',
@@ -20,7 +20,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CHEST,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Barbell', 'Bench'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Incline%20Barbell%20Bench%20Press/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/l0HlOaQcLJ2hHpYdy/giphy.gif'
   },
   {
     id: 'ex-db-press',
@@ -29,7 +29,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CHEST,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells', 'Bench'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Dumbbell%20Bench%20Press/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/zB4t8Ky55Fh72/giphy.gif'
   },
   {
     id: 'ex-inc-db',
@@ -38,7 +38,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CHEST,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells', 'Bench'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Incline%20Dumbbell%20Press/0.jpg'
   },
   {
     id: 'ex-cable-fly',
@@ -47,7 +46,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CHEST,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Cable Machine'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Cable%20Crossover/0.jpg'
   },
   {
     id: 'ex-pec-dec',
@@ -64,7 +62,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CHEST,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Bodyweight'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Pushups/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/K61C9A0y9ZkIM/giphy.gif'
   },
   {
     id: 'ex-dip',
@@ -73,7 +71,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CHEST,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Dip Station'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Dips/0.jpg'
   },
 
   // --- BACK ---
@@ -84,7 +81,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.BACK,
     difficulty: Difficulty.ADVANCED,
     equipment: ['Barbell'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Barbell%20Deadlift/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/pS2sR94L35LCo/giphy.gif'
   },
   {
     id: 'ex-pullup',
@@ -93,7 +90,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.BACK,
     difficulty: Difficulty.ADVANCED,
     equipment: ['Pull Up Bar'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Pullups/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/eJ4j2VnFOXCso/giphy.gif'
   },
   {
     id: 'ex-lat-pulldown',
@@ -102,7 +99,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.BACK,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Cable Machine'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Cable%20Pulldown/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif'
   },
   {
     id: 'ex-bb-row',
@@ -111,7 +108,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.BACK,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Barbell'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Barbell%20Bent%20Over%20Row/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/12k3V5m2p2x81a/giphy.gif'
   },
   {
     id: 'ex-db-row',
@@ -120,7 +117,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.BACK,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells', 'Bench'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Dumbbell%20Row/0.jpg'
   },
   {
     id: 'ex-seat-row',
@@ -129,7 +125,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.BACK,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Cable Machine'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Seated%20Cable%20Row/0.jpg'
   },
   {
     id: 'ex-face-pull',
@@ -138,7 +133,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.BACK,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Cable Machine'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Face%20Pull/0.jpg'
   },
   {
     id: 'ex-hyperext',
@@ -157,7 +151,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Barbell', 'Rack'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Barbell%20Squat/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/10h8CdMQUTEZqM/giphy.gif'
   },
   {
     id: 'ex-db-lunge',
@@ -166,8 +160,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Dumbbells'],
-    // Using a publicly available stock video to demonstrate video player capabilities
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4'
+    videoUrl: 'https://media.giphy.com/media/3oKIPDO5JgyF65FTEI/giphy.gif'
   },
   {
     id: 'ex-fs',
@@ -176,7 +169,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.ADVANCED,
     equipment: ['Barbell', 'Rack'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Front%20Squat/0.jpg'
   },
   {
     id: 'ex-leg-press',
@@ -185,7 +177,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Machine'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Leg%20Press/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/3o7TKUM3IgJBX2as9O/giphy.gif'
   },
   {
     id: 'ex-lunge',
@@ -194,7 +186,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Dumbbell%20Lunges/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/3oKIPDO5JgyF65FTEI/giphy.gif'
   },
   {
     id: 'ex-hip-thrust',
@@ -203,7 +195,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Barbell', 'Bench'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Barbell%20Glute%20Bridge/0.jpg'
   },
   {
     id: 'ex-bg-split',
@@ -220,7 +211,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Machine'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Leg%20Extensions/0.jpg'
   },
   {
     id: 'ex-leg-curl',
@@ -229,7 +219,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Machine'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Lying%20Leg%20Curls/0.jpg'
   },
   {
     id: 'ex-rdl',
@@ -238,7 +227,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Barbell'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Romanian%20Deadlift/0.jpg'
   },
   {
     id: 'ex-calf-raise',
@@ -247,7 +235,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Machine'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Calf%20Raises/0.jpg'
   },
 
   // --- SHOULDERS ---
@@ -258,7 +245,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.SHOULDERS,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Barbell'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Military%20Press/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/l41Ym49ppcDP6iY3C/giphy.gif'
   },
   {
     id: 'ex-db-shoulder',
@@ -267,7 +254,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.SHOULDERS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells', 'Bench'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Seated%20Dumbbell%20Press/0.jpg'
   },
   {
     id: 'ex-lat-raise',
@@ -276,7 +262,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.SHOULDERS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Side%20Lateral%20Raise/0.jpg'
   },
   {
     id: 'ex-front-raise',
@@ -285,7 +270,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.SHOULDERS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Front%20Dumbbell%20Raise/0.jpg'
   },
   {
     id: 'ex-rev-fly',
@@ -302,7 +286,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.SHOULDERS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Dumbbell%20Shrugs/0.jpg'
   },
 
   // --- ARMS ---
@@ -313,7 +296,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.ARMS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Barbell'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Barbell%20Curl/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/l41Yh1OL32vL4Z8wU/giphy.gif'
   },
   {
     id: 'ex-db-curl',
@@ -322,7 +305,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.ARMS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Dumbbell%20Bicep%20Curl/0.jpg'
   },
   {
     id: 'ex-hammer',
@@ -331,7 +313,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.ARMS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Dumbbells'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Hammer%20Curls/0.jpg'
   },
   {
     id: 'ex-preacher',
@@ -340,7 +321,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.ARMS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['EZ Bar', 'Bench'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Preacher%20Curl/0.jpg'
   },
   {
     id: 'ex-tri-push',
@@ -349,7 +329,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.ARMS,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Cable Machine'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Tricep%20Pushdown/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/3o7TKME3o9cK3O0g48/giphy.gif'
   },
   {
     id: 'ex-skull',
@@ -358,7 +338,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.ARMS,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['EZ Bar', 'Bench'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Skullcrusher/0.jpg'
   },
   {
     id: 'ex-ohm-ext',
@@ -371,22 +350,13 @@ export const MOCK_EXERCISES: Exercise[] = [
 
   // --- CORE & MOBILITY ---
   {
-    id: 'ex-34-situp',
-    name: '3/4 Sit-Up',
-    description: 'Lie down on the floor and secure your feet. Your legs should be bent at the knees. Place your hands behind or to the side of your head. You will begin with your back on the ground. This will be your starting position. Flex your hips and spine to raise your torso toward your knees. At the top of the motion your torso should be perpendicular to the floor. Reverse the motion, going only ¾ of the way down. This is the end of the repetition.',
-    muscleGroup: MuscleGroup.CORE,
-    difficulty: Difficulty.BEGINNER,
-    equipment: ['Bodyweight']
-    // Removed videoUrl to fix playback error - will use image placeholder or repo image
-  },
-  {
     id: 'ex-plank',
     name: 'Plank',
     description: 'Isometric core stability.',
     muscleGroup: MuscleGroup.CORE,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Mat'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Plank/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/xT8qBff8cRBFsl5T8s/giphy.gif'
   },
   {
     id: 'ex-crunch',
@@ -395,7 +365,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CORE,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Mat'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Crunch/0.jpg'
   },
   {
     id: 'ex-leg-raise',
@@ -404,7 +373,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CORE,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Pull Up Bar'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Hanging%20Leg%20Raise/0.jpg'
   },
   {
     id: 'ex-rus-twist',
@@ -413,7 +381,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CORE,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Medicine Ball'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Russian%20Twist/0.jpg'
   },
   {
     id: 'ex-ab-roll',
@@ -422,7 +389,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CORE,
     difficulty: Difficulty.ADVANCED,
     equipment: ['Ab Wheel'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Ab%20Roller/0.jpg'
   },
   {
     id: 'ex-foam-roll',
@@ -439,7 +405,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Kettlebell'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Kettlebell%20Swing/0.jpg'
   },
 
   // --- CARDIO ---
@@ -450,6 +415,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CARDIO,
     difficulty: Difficulty.BEGINNER,
     equipment: ['Treadmill'],
+    videoUrl: 'https://media.giphy.com/media/l2JhtVkS9g61vP076/giphy.gif'
   },
   {
     id: 'ex-bike',
@@ -474,7 +440,7 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.CARDIO,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Bodyweight'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Burpees/0.jpg'
+    videoUrl: 'https://media.giphy.com/media/26BkN21wz7w28pUv6/giphy.gif'
   },
   {
     id: 'ex-box-jump',
@@ -483,7 +449,6 @@ export const MOCK_EXERCISES: Exercise[] = [
     muscleGroup: MuscleGroup.LEGS,
     difficulty: Difficulty.INTERMEDIATE,
     equipment: ['Box'],
-    videoUrl: 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/Box%20Jump/0.jpg'
   }
 ];
 

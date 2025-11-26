@@ -95,19 +95,10 @@ const Exercises: React.FC<ExercisesProps> = ({ exercises, setExercises, isLoadin
       try {
           const imageBase64 = await generateExerciseImage(ex.name, ex.description, ex.muscleGroup);
           if (imageBase64) {
-              // 1. Save to LocalStorage for persistence
-              try {
-                  const savedImages = JSON.parse(localStorage.getItem('fitpro_ai_images') || '{}');
-                  savedImages[ex.id] = imageBase64;
-                  localStorage.setItem('fitpro_ai_images', JSON.stringify(savedImages));
-              } catch (storageErr) {
-                  console.warn("LocalStorage quota exceeded, image won't persist after reload.", storageErr);
-              }
-
-              // 2. Update main list state
+              // Update main list
               setExercises(prev => prev.map(e => e.id === ex.id ? { ...e, videoUrl: imageBase64 } : e));
               
-              // 3. Update modal view if open
+              // Update modal view if open
               if (viewingExercise?.id === ex.id) {
                   setViewingExercise(prev => prev ? { ...prev, videoUrl: imageBase64 } : null);
               }
@@ -128,8 +119,6 @@ const Exercises: React.FC<ExercisesProps> = ({ exercises, setExercises, isLoadin
       try {
           const videoBlobUrl = await generateExerciseVideo(ex.name, ex.description);
           if (videoBlobUrl) {
-               // Video Blob URLs cannot be saved to LocalStorage (they expire). 
-               // In a real app, you'd upload 'blob' to S3.
                setExercises(prev => prev.map(e => e.id === ex.id ? { ...e, videoUrl: videoBlobUrl } : e));
                if (viewingExercise?.id === ex.id) {
                   setViewingExercise(prev => prev ? { ...prev, videoUrl: videoBlobUrl } : null);
@@ -228,15 +217,10 @@ const Exercises: React.FC<ExercisesProps> = ({ exercises, setExercises, isLoadin
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Helper to check if url is video or youtube
+  // Helper to check if url is video
   const isVideo = (url?: string) => {
       if (!url) return false;
-      return url.includes('blob:') || url.endsWith('.mp4') || url.endsWith('.webm') || url.includes('googlevideo') || url.includes('youtube.com') || url.includes('youtu.be');
-  };
-
-  const isYoutube = (url?: string) => {
-      if (!url) return false;
-      return url.includes('youtube.com') || url.includes('youtu.be');
+      return url.includes('blob:') || url.endsWith('.mp4') || url.endsWith('.webm') || url.includes('googlevideo');
   };
 
   return (
@@ -247,7 +231,7 @@ const Exercises: React.FC<ExercisesProps> = ({ exercises, setExercises, isLoadin
           <h2 className="text-2xl font-bold text-slate-800">Exercise Library</h2>
           <p className="text-slate-500">Manage your database of movements.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
             <button 
                 onClick={() => setShowAiModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors"
@@ -361,35 +345,9 @@ const Exercises: React.FC<ExercisesProps> = ({ exercises, setExercises, isLoadin
                     {/* IMAGE OR FALLBACK OR VIDEO PREVIEW */}
                     {ex.videoUrl ? (
                         isVideo(ex.videoUrl) ? (
-                             isYoutube(ex.videoUrl) ? (
-                                <iframe 
-                                    key={ex.videoUrl} 
-                                    src={ex.videoUrl} 
-                                    className="w-full h-full object-cover bg-black pointer-events-none" 
-                                    allow="autoplay; encrypted-media" 
-                                    title={ex.name}
-                                    referrerPolicy="origin"
-                                />
-                             ) : (
-                                <video 
-                                    key={ex.videoUrl} 
-                                    src={ex.videoUrl} 
-                                    className="w-full h-full object-cover bg-black" 
-                                    muted 
-                                    loop 
-                                    onMouseOver={e => e.currentTarget.play()} 
-                                    onMouseOut={e => e.currentTarget.pause()} 
-                                    onError={(e) => {
-                                        // If video fails, hide it and show fallback
-                                        (e.target as HTMLVideoElement).style.display = 'none';
-                                        const fallback = (e.target as HTMLVideoElement).nextElementSibling as HTMLElement;
-                                        if (fallback) fallback.style.display = 'flex';
-                                    }}
-                                />
-                             )
+                             <video src={ex.videoUrl} className="w-full h-full object-cover bg-black" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
                         ) : (
                              <img 
-                                key={ex.videoUrl}
                                 src={ex.videoUrl} 
                                 alt={ex.name} 
                                 referrerPolicy="no-referrer"
@@ -485,27 +443,11 @@ const Exercises: React.FC<ExercisesProps> = ({ exercises, setExercises, isLoadin
                        {viewingExercise.videoUrl ? (
                            <div className="relative w-full h-full flex items-center justify-center group">
                                {isVideo(viewingExercise.videoUrl) ? (
-                                   isYoutube(viewingExercise.videoUrl) ? (
-                                        <iframe 
-                                            src={viewingExercise.videoUrl} 
-                                            className="w-full h-full min-h-[300px] md:min-h-[400px] aspect-video shadow-lg rounded-lg bg-black"
-                                            allow="autoplay; encrypted-media; picture-in-picture" 
-                                            allowFullScreen
-                                            referrerPolicy="origin"
-                                        />
-                                   ) : (
-                                        <video 
-                                            key={viewingExercise.id} // Force re-render on change
-                                            src={viewingExercise.videoUrl} 
-                                            controls 
-                                            className="max-w-full max-h-[60vh] shadow-lg rounded-lg bg-black"
-                                            onError={(e) => {
-                                                (e.target as HTMLVideoElement).style.display = 'none';
-                                                const fallback = (e.target as HTMLVideoElement).parentElement?.nextElementSibling as HTMLElement;
-                                                if (fallback) fallback.style.display = 'flex';
-                                            }}
-                                        />
-                                   )
+                                   <video 
+                                      src={viewingExercise.videoUrl} 
+                                      controls 
+                                      className="max-w-full max-h-[60vh] shadow-lg rounded-lg bg-black"
+                                   />
                                ) : (
                                    <img 
                                        src={viewingExercise.videoUrl} 
@@ -519,10 +461,20 @@ const Exercises: React.FC<ExercisesProps> = ({ exercises, setExercises, isLoadin
                                        }}
                                    />
                                )}
+                               {!isVideo(viewingExercise.videoUrl) && (
+                                 <div className="absolute bottom-2 right-2 flex gap-2">
+                                    <button 
+                                            onClick={() => handleGenerateImageForExercise(viewingExercise)}
+                                            className="bg-white/90 p-2 rounded-full shadow text-slate-500 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Regenerate Image"
+                                    >
+                                        <RefreshCw size={16} />
+                                    </button>
+                                 </div>
+                               )}
                            </div>
                        ) : null}
                        
-                       {/* Fallback / No Image State */}
                        <div 
                             className="flex flex-col items-center text-center text-slate-400 p-10 w-full"
                             style={{ display: viewingExercise.videoUrl ? 'none' : 'flex' }}
@@ -539,8 +491,8 @@ const Exercises: React.FC<ExercisesProps> = ({ exercises, setExercises, isLoadin
                            </button>
                        </div>
 
-                       {/* Generator Buttons Overlay - Always visible to allow regeneration */}
-                       <div className="absolute bottom-4 flex gap-3">
+                       {/* Generator Buttons Overlay */}
+                       <div className={`absolute bottom-4 flex gap-3 ${viewingExercise.videoUrl && isVideo(viewingExercise.videoUrl) ? 'hidden' : ''}`}>
                            <button 
                                 onClick={() => handleGenerateImageForExercise(viewingExercise)}
                                 disabled={isGeneratingImage || isGeneratingVideo}

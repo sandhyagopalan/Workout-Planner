@@ -1,8 +1,7 @@
 
 import { Exercise, MuscleGroup, Difficulty } from "../types";
 
-// CHANGED: Use jsDelivr CDN for reliable access to GitHub raw files
-// This bypasses raw.githubusercontent hotlinking protections
+// CHANGED: Switch to jsDelivr CDN for reliable, fast image serving
 const BASE_REPO_URL = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main';
 const EXERCISES_JSON_URL = `${BASE_REPO_URL}/dist/exercises.json`;
 
@@ -15,7 +14,7 @@ const mapMuscleToGroup = (muscle: string): MuscleGroup => {
   if (['biceps', 'triceps', 'forearms'].includes(m)) return MuscleGroup.ARMS;
   if (['lats', 'middle back', 'lower back', 'traps'].includes(m)) return MuscleGroup.BACK;
   if (['shoulders', 'neck', 'deltoids'].includes(m)) return MuscleGroup.SHOULDERS;
-  if (['quadriceps', 'hamstrings', 'calves', 'glutes', 'abductors', 'adductors'].includes(m)) return MuscleGroup.LEGS;
+  if (['quadriceps', 'hamstrings', 'calves', 'glutes', 'abductors', 'adductors', 'upper legs', 'lower legs'].includes(m)) return MuscleGroup.LEGS;
   if (['cardio'].includes(m)) return MuscleGroup.CARDIO;
   return MuscleGroup.FULL_BODY;
 };
@@ -43,16 +42,10 @@ export const fetchFreeExerciseDb = async (): Promise<Exercise[]> => {
       
       if (item.images && item.images.length > 0) {
           const rawPath = item.images[0]; 
-          // rawPath is usually "exercises/Exercise Name/0.jpg" or similar
-          
-          // 1. Remove leading slash if present
           const cleanPath = rawPath.startsWith('/') ? rawPath.slice(1) : rawPath;
-          
-          // 2. Split by slashes to encode each segment individually
-          // This correctly handles "exercises/Ab Roller/0.jpg" -> "exercises/Ab%20Roller/0.jpg"
-          // preserving the directory structure but encoding spaces and special chars in filenames.
           const parts = cleanPath.split('/');
-          const encodedPath = parts.map((part: string) => encodeURIComponent(part)).join('/');
+          const encodedParts = parts.map((part: string) => encodeURIComponent(part));
+          const encodedPath = encodedParts.join('/');
           
           imageUrl = `${BASE_REPO_URL}/${encodedPath}`;
       }

@@ -39,14 +39,6 @@ const App: React.FC = () => {
         console.log("Fetching external exercise database...");
         const externalExercises = await fetchFreeExerciseDb();
         
-        // Load persisted AI images from LocalStorage
-        let savedImages: Record<string, string> = {};
-        try {
-            savedImages = JSON.parse(localStorage.getItem('fitpro_ai_images') || '{}');
-        } catch (e) {
-            console.error("Failed to load saved images from storage", e);
-        }
-
         setExercises(prevExercises => {
           // 1. Create a lookup map for external exercises using normalized names
           const externalMap = new Map<string, Exercise>();
@@ -57,20 +49,16 @@ const App: React.FC = () => {
           // 2. Clone current exercises to avoid mutation
           const updatedExercises = prevExercises.map(e => ({...e}));
 
-          // 3. Iterate through LOCAL exercises and match with External OR Saved Images
+          // 3. Iterate through LOCAL exercises and try to find a match in EXTERNAL to get an image
+          // ONLY if the local one doesn't already have a video/image URL.
           updatedExercises.forEach(localEx => {
-              // PRIORITY 1: Saved AI Image (User Generated)
-              if (savedImages[localEx.id]) {
-                  localEx.videoUrl = savedImages[localEx.id];
-              } 
-              // PRIORITY 2: External DB Match (if no local image exists)
-              else if (!localEx.videoUrl || localEx.videoUrl === '') {
+              if (!localEx.videoUrl || localEx.videoUrl === '') {
                   const normName = normalizeName(localEx.name);
                   
                   // Try exact match first
                   let match = externalMap.get(normName);
                   
-                  // Try partial match if exact fails
+                  // Try partial match if exact fails (e.g. "Barbell Squat" vs "Barbell Squat - High Bar")
                   if (!match) {
                        for (const [extName, extEx] of externalMap.entries()) {
                            if (extName.includes(normName) || normName.includes(extName)) {
@@ -91,10 +79,6 @@ const App: React.FC = () => {
           
           externalExercises.forEach(ext => {
               if (!existingNames.has(normalizeName(ext.name))) {
-                  // Check if we have a saved image for this external exercise ID (unlikely but possible if ID stable)
-                  if (savedImages[ext.id]) {
-                      ext.videoUrl = savedImages[ext.id];
-                  }
                   updatedExercises.push(ext);
               }
           });
