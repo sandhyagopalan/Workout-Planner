@@ -4,6 +4,7 @@ import { Client, Workout, Program, Exercise } from '../../types';
 import Onboarding from './Onboarding';
 import ClientDashboard from './ClientDashboard';
 import WorkoutPlayer from './WorkoutPlayer';
+import ClientProfile from './ClientProfile';
 import { Home, Calendar, MessageSquare, User, LogOut } from 'lucide-react';
 
 interface ClientAppProps {
@@ -18,7 +19,7 @@ interface ClientAppProps {
 const ClientApp: React.FC<ClientAppProps> = ({ client, workouts, programs, exercises, onUpdateClient, onExit }) => {
   const [showOnboarding, setShowOnboarding] = useState(!client.onboardingComplete);
   const [activeTab, setActiveTab] = useState('home');
-  const [view, setView] = useState<'dashboard' | 'player'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'player' | 'profile'>('dashboard');
 
   // Determine Today's Workout Logic
   const todayWorkout = useMemo(() => {
@@ -87,6 +88,12 @@ const ClientApp: React.FC<ClientAppProps> = ({ client, workouts, programs, exerc
       setView('dashboard');
   };
 
+  const handleTabChange = (tab: string) => {
+      setActiveTab(tab);
+      if (tab === 'home') setView('dashboard');
+      if (tab === 'profile') setView('profile');
+  };
+
   if (showOnboarding) {
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-900 p-4">
@@ -114,7 +121,7 @@ const ClientApp: React.FC<ClientAppProps> = ({ client, workouts, programs, exerc
 
             {/* Main Content Area */}
             <div className="flex-1 overflow-hidden bg-white relative">
-                {view === 'dashboard' ? (
+                {view === 'dashboard' && (
                     <div className="h-full overflow-y-auto scrollbar-hide pb-24 animate-in slide-in-from-left-4 duration-300">
                         <ClientDashboard 
                             client={client} 
@@ -122,7 +129,15 @@ const ClientApp: React.FC<ClientAppProps> = ({ client, workouts, programs, exerc
                             onStartWorkout={() => setView('player')} 
                         />
                     </div>
-                ) : (
+                )}
+                
+                {view === 'profile' && (
+                    <div className="h-full overflow-y-auto scrollbar-hide pb-24">
+                        <ClientProfile client={client} onUpdate={onUpdateClient} />
+                    </div>
+                )}
+
+                {view === 'player' && (
                     todayWorkout ? (
                         <div className="h-full animate-in slide-in-from-right-4 duration-300 bg-white">
                             <WorkoutPlayer 
@@ -141,12 +156,12 @@ const ClientApp: React.FC<ClientAppProps> = ({ client, workouts, programs, exerc
                 )}
             </div>
             
-            {/* Floating Bottom Navigation (Only on Dashboard) */}
-            {view === 'dashboard' && (
+            {/* Floating Bottom Navigation (Only on Dashboard/Profile) */}
+            {(view === 'dashboard' || view === 'profile') && (
                 <div className="absolute bottom-6 left-6 right-6 z-40">
                     <div className="bg-slate-900/90 backdrop-blur-xl p-1.5 rounded-[2rem] flex justify-between items-center shadow-2xl border border-white/10">
                         <button 
-                            onClick={() => setActiveTab('home')}
+                            onClick={() => handleTabChange('home')}
                             className={`h-12 w-12 flex items-center justify-center rounded-full transition-all duration-300 ${activeTab === 'home' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}
                         >
                             <Home size={22} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
@@ -173,12 +188,20 @@ const ClientApp: React.FC<ClientAppProps> = ({ client, workouts, programs, exerc
                             <MessageSquare size={22} />
                         </button>
                         
-                        <button onClick={onExit} className="h-12 w-12 flex items-center justify-center rounded-full text-red-400 hover:bg-red-500/20 transition-colors">
-                            <LogOut size={22} />
+                        <button 
+                            onClick={() => handleTabChange('profile')}
+                            className={`h-12 w-12 flex items-center justify-center rounded-full transition-all duration-300 ${activeTab === 'profile' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            <User size={22} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
                         </button>
                     </div>
                 </div>
             )}
+            
+            {/* Exit Button (Debug) */}
+            <button onClick={onExit} className="absolute top-12 right-6 z-[60] p-2 bg-black/10 hover:bg-black/20 rounded-full text-slate-900 transition-colors">
+                <LogOut size={16} />
+            </button>
             
             {/* Home Indicator */}
             <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1/3 h-1 bg-slate-300 rounded-full mb-2 z-50 pointer-events-none"></div>

@@ -365,3 +365,58 @@ export const generateExerciseVideo = async (exerciseName: string, description: s
     throw error; // Propagate specific error for UI handling
   }
 };
+
+export const getExerciseSubstitute = async (
+    originalExerciseName: string, 
+    reason: 'Busy' | 'Pain',
+    painDetails?: string
+): Promise<{ name: string, reason: string, type: string }[]> => {
+    try {
+        const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        let prompt = '';
+
+        if (reason === 'Busy') {
+            prompt = `Suggest 3 DISTINCT substitutes for '${originalExerciseName}' because the equipment is busy.
+            CRITICAL: Assume the primary station (like the Bench or Rack) might be the bottleneck.
+            1. Direct Equipment Swap (e.g., Barbell -> Dumbbell).
+            2. Station-Free Variation (e.g., Floor Press, Standing, or different station).
+            3. Machine or Bodyweight alternative.`;
+        } else {
+            // Pain Logic Upgrade: Check Biomechanical Relevance
+            prompt = `Suggest 3 SAFE alternatives for '${originalExerciseName}'.
+            The user has PAIN: '${painDetails}'.
+            
+            CRITICAL ANALYSIS:
+            1. Is the painful area a PRIMARY MOVER? (e.g., Shoulder in Bench Press). If yes, suggest a biomechanically safer alternative (e.g., Floor Press or Neutral Grip).
+            2. Is the painful area IRRELEVANT/STABILIZER? (e.g., Calf pain in Bench Press). If yes, suggest a MODIFICATION (e.g. "Feet-Up Bench") or a Machine Isolation that removes load from that part.`;
+        }
+
+        const response = await dynamicAi.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: { 
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            name: { type: Type.STRING },
+                            reason: { type: Type.STRING },
+                            type: { type: Type.STRING }
+                        },
+                        required: ["name", "reason", "type"]
+                    }
+                }
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("No response");
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (error) {
+        console.error("Error finding substitute:", error);
+        throw error;
+    }
+};
