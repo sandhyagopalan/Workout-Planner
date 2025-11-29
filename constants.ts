@@ -1,8 +1,89 @@
 
-import { Client, Difficulty, Exercise, MuscleGroup, Program, Workout } from "./types";
+import { Client, Difficulty, Exercise, MuscleGroup, Program, Workout, Questionnaire } from "./types";
+
+// --- GLOBAL DEFINITIONS ---
+export const GOAL_OPTIONS = [
+  "Weight Loss",
+  "Muscle Gain",
+  "General Fitness",
+  "Endurance",
+  "Flexibility & Mobility",
+  "Athletic Performance",
+  "Strength & Power",
+  "Rehabilitation"
+];
+
+// --- DEFAULT ASSESSMENT FORM ---
+export const DEFAULT_INTAKE_QUESTIONNAIRE: Questionnaire = {
+  id: 'q-intake-default',
+  title: 'Comprehensive Fitness Assessment',
+  questions: [
+    {
+      id: 'g-1',
+      text: 'What are your fitness goals?',
+      type: 'multiselect',
+      options: [
+        'Appearance (aesthetics)', 'Cardiovascular endurance', 'Flexibility',
+        'Health (General)', 'Muscular definition', 'Muscular size',
+        'Muscular strength/power', 'Self-esteem or confidence', 'Speed',
+        'Sports performance', 'Stress reduction', 'Toning and shaping',
+        'Weight loss', 'Posture'
+      ]
+    },
+    { id: 'g-2', text: 'Other fitness goals (if not selected above)', type: 'text' },
+    {
+      id: 'h-1',
+      text: 'Do you exercise regularly?',
+      type: 'select',
+      options: ['--', 'I have never exercised regularly', 'I used to exercise regularly', 'I currently exercise regularly']
+    },
+    {
+      id: 'h-2',
+      text: 'Rate your ability to perform cardio exercises',
+      type: 'select',
+      options: ['--', 'Very Low', 'Fair', 'Average', 'Good', 'Excellent']
+    },
+    {
+      id: 'h-3',
+      text: 'Rate your experience with exercise',
+      type: 'select',
+      options: ['--', 'Beginner', 'Intermediate', 'Advanced']
+    },
+    {
+      id: 'eq-1',
+      text: 'What equipment do you have access to?',
+      type: 'multiselect',
+      options: [
+        'Free weights (dumbbell/barbells)', 'Gym machines', 'Cable weights',
+        'Resistance bands', 'Bosu balls', 'Kettlebells', 'TRX bands', 'Bowflex'
+      ]
+    },
+    {
+      id: 'av-1',
+      text: 'On which days are you available to work out?',
+      type: 'multiselect',
+      options: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    },
+    {
+      id: 'av-2',
+      text: 'How frequently do you have time to exercise?',
+      type: 'select',
+      options: ['--', '1-3 days a week', '4-5 days a week', '6-7 days a week', 'Up to trainer to decide']
+    },
+    { id: 'm-1', text: 'Do you have any existing injuries or conditions that I should be aware of while building your training plan?', type: 'textarea' },
+    {
+      id: 'l-1',
+      text: 'Do you smoke tobacco products?',
+      type: 'select',
+      options: ['--', 'No', 'Yes']
+    },
+    { id: 'c-1', text: 'Any other comments about what you would like to see in your fitness plan?', type: 'textarea' }
+  ]
+};
 
 // --- 1. EXPANDED EXERCISE LIBRARY (Simulating ExerciseDB) ---
 export const MOCK_EXERCISES: Exercise[] = [
+  // ... existing exercises ...
   // --- CHEST ---
   {
     id: 'ex-bp',
@@ -454,6 +535,7 @@ export const MOCK_EXERCISES: Exercise[] = [
 
 // --- 2. MODULAR WORKOUTS (Now utilizing the full library) ---
 export const MOCK_WORKOUTS: Workout[] = [
+  // ... existing workouts ...
   // --- Strength Foundation ---
   {
     id: 'wk-5x5-a',
@@ -565,8 +647,8 @@ export const MOCK_WORKOUTS: Workout[] = [
   },
   {
     id: 'wk-glute',
-    title: 'Glute Gains Builder',
-    description: 'Specific targeted work for glute development.',
+    title: 'Glute Focus',
+    description: 'Specialized program for lower body development with glute priority.',
     type: 'Hypertrophy',
     durationMinutes: 50,
     difficulty: Difficulty.INTERMEDIATE,
@@ -684,66 +766,7 @@ export const WORKOUT_TEMPLATES = [
       { exerciseId: 'ex-bb-row', sets: 5, reps: '5', restSeconds: 180, notes: 'Row: Explosive pull' }
     ]
   },
-  {
-    title: "Upper Body Power Template",
-    description: "Heavy compound movements for the upper body. Ideal for split routines.",
-    type: "Strength",
-    image: "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=80",
-    exercises: [
-      { exerciseId: 'ex-bp', sets: 4, reps: '6', restSeconds: 180 },
-      { exerciseId: 'ex-bb-row', sets: 4, reps: '6', restSeconds: 180 },
-      { exerciseId: 'ex-ohp', sets: 3, reps: '8', restSeconds: 120 },
-      { exerciseId: 'ex-pullup', sets: 3, reps: 'AMRAP', restSeconds: 120 }
-    ]
-  },
-  {
-    title: "Lower Body Hypertrophy Template",
-    description: "Volume focused leg day template targeting quads, hamstrings, and glutes.",
-    type: "Hypertrophy",
-    image: "https://images.unsplash.com/photo-1574680096141-6331816e265a?auto=format&fit=crop&w=800&q=80",
-    exercises: [
-      { exerciseId: 'ex-sq', sets: 4, reps: '10', restSeconds: 120 },
-      { exerciseId: 'ex-rdl', sets: 3, reps: '12', restSeconds: 90 },
-      { exerciseId: 'ex-leg-press', sets: 3, reps: '15', restSeconds: 90 },
-      { exerciseId: 'ex-calf-raise', sets: 4, reps: '20', restSeconds: 60 }
-    ]
-  },
-  {
-    title: "Full Body HIIT Circuit",
-    description: "Metabolic conditioning circuit. Perform exercises back to back with minimal rest.",
-    type: "HIIT",
-    image: "https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?auto=format&fit=crop&w=800&q=80",
-    exercises: [
-      { exerciseId: 'ex-burpee', sets: 4, reps: '45s', restSeconds: 15 },
-      { exerciseId: 'ex-kb-swing', sets: 4, reps: '45s', restSeconds: 15 },
-      { exerciseId: 'ex-box-jump', sets: 4, reps: '45s', restSeconds: 15 },
-      { exerciseId: 'ex-plank', sets: 4, reps: '60s', restSeconds: 60 }
-    ]
-  },
-  {
-    title: "Push / Pull / Legs (Push Day)",
-    description: "Standard Push day template focusing on Chest, Shoulders, and Triceps.",
-    type: "Hypertrophy",
-    image: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=800&q=80",
-    exercises: [
-      { exerciseId: 'ex-bp', sets: 3, reps: '8-10', restSeconds: 90 },
-      { exerciseId: 'ex-ohp', sets: 3, reps: '10-12', restSeconds: 90 },
-      { exerciseId: 'ex-inc-db', sets: 3, reps: '12', restSeconds: 60 },
-      { exerciseId: 'ex-lat-raise', sets: 3, reps: '15', restSeconds: 60 },
-      { exerciseId: 'ex-tri-push', sets: 3, reps: '15', restSeconds: 60 }
-    ]
-  },
-  {
-    title: "Mobility & Recovery Flow",
-    description: "Low intensity session to improve range of motion and recovery.",
-    type: "Mobility",
-    image: "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?auto=format&fit=crop&w=800&q=80",
-    exercises: [
-      { exerciseId: 'ex-foam-roll', sets: 1, reps: '10 min', restSeconds: 0 },
-      { exerciseId: 'ex-face-pull', sets: 3, reps: '20', restSeconds: 60 },
-      { exerciseId: 'ex-hyperext', sets: 3, reps: '15', restSeconds: 60 }
-    ]
-  }
+  // ... other templates ...
 ];
 
 // --- 4. PROGRAM TAGS ---
@@ -768,10 +791,10 @@ export const MOCK_PROGRAMS: Program[] = [
     tags: ['Strength', 'Beginner'],
     image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80',
     schedule: {
-      1: ['wk-5x5-a', 'wk-5x5-b', 'wk-5x5-a'], // M/W/F
-      2: ['wk-5x5-b', 'wk-5x5-a', 'wk-5x5-b'],
-      3: ['wk-5x5-a', 'wk-5x5-b', 'wk-5x5-a'],
-      4: ['wk-5x5-b', 'wk-5x5-a', 'wk-5x5-b']
+      1: ['wk-5x5-a', null, 'wk-5x5-b', null, 'wk-5x5-a', null, null], // M,W,F (Index 0,2,4)
+      2: ['wk-5x5-b', null, 'wk-5x5-a', null, 'wk-5x5-b', null, null],
+      3: ['wk-5x5-a', null, 'wk-5x5-b', null, 'wk-5x5-a', null, null],
+      4: ['wk-5x5-b', null, 'wk-5x5-a', null, 'wk-5x5-b', null, null]
     }
   },
   {
@@ -782,10 +805,10 @@ export const MOCK_PROGRAMS: Program[] = [
     tags: ['Strength', 'Hypertrophy', 'Intermediate'],
     image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=80',
     schedule: {
-      1: ['wk-upper-power', 'wk-lower-power', 'wk-core', 'wk-upper-power', 'wk-lower-power'], // M,T,(Core),Th,F
-      2: ['wk-upper-power', 'wk-lower-power', 'wk-core', 'wk-upper-power', 'wk-lower-power'],
-      3: ['wk-upper-power', 'wk-lower-power', 'wk-core', 'wk-upper-power', 'wk-lower-power'],
-      4: ['wk-upper-power', 'wk-lower-power', 'wk-core', 'wk-upper-power', 'wk-lower-power']
+      1: ['wk-upper-power', 'wk-lower-power', null, 'wk-upper-power', 'wk-lower-power', null, null], // M,T,Th,F
+      2: ['wk-upper-power', 'wk-lower-power', null, 'wk-upper-power', 'wk-lower-power', null, null],
+      3: ['wk-upper-power', 'wk-lower-power', null, 'wk-upper-power', 'wk-lower-power', null, null],
+      4: ['wk-upper-power', 'wk-lower-power', null, 'wk-upper-power', 'wk-lower-power', null, null]
     }
   },
   {
@@ -796,10 +819,10 @@ export const MOCK_PROGRAMS: Program[] = [
     tags: ['Hypertrophy', 'Advanced'],
     image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=800&q=80',
     schedule: {
-      1: ['wk-push', 'wk-pull', 'wk-legs', 'wk-push', 'wk-pull', 'wk-legs', 'wk-core'], // 6 days on, core on sunday
-      2: ['wk-push', 'wk-pull', 'wk-legs', 'wk-push', 'wk-pull', 'wk-legs', 'wk-core'],
-      3: ['wk-push', 'wk-pull', 'wk-legs', 'wk-push', 'wk-pull', 'wk-legs', 'wk-core'],
-      4: ['wk-push', 'wk-pull', 'wk-legs', 'wk-push', 'wk-pull', 'wk-legs', 'wk-core']
+      1: ['wk-push', 'wk-pull', 'wk-legs', 'wk-push', 'wk-pull', 'wk-legs', null], // 6 days on, 1 off
+      2: ['wk-push', 'wk-pull', 'wk-legs', 'wk-push', 'wk-pull', 'wk-legs', null],
+      3: ['wk-push', 'wk-pull', 'wk-legs', 'wk-push', 'wk-pull', 'wk-legs', null],
+      4: ['wk-push', 'wk-pull', 'wk-legs', 'wk-push', 'wk-pull', 'wk-legs', null]
     }
   },
   {
@@ -810,10 +833,10 @@ export const MOCK_PROGRAMS: Program[] = [
     tags: ['Fat Loss', 'Endurance', 'Intermediate'],
     image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?auto=format&fit=crop&w=800&q=80',
     schedule: {
-      1: ['wk-5x5-a', 'wk-hiit', 'wk-5x5-b', 'wk-hiit', 'wk-core'],
-      2: ['wk-5x5-b', 'wk-hiit', 'wk-5x5-a', 'wk-hiit', 'wk-core'],
-      3: ['wk-5x5-a', 'wk-hiit', 'wk-5x5-b', 'wk-hiit', 'wk-core'],
-      4: ['wk-5x5-b', 'wk-hiit', 'wk-5x5-a', 'wk-hiit', 'wk-core']
+      1: ['wk-5x5-a', 'wk-hiit', 'wk-5x5-b', 'wk-hiit', null, 'wk-core', null], // M,T,W,Th,Sat
+      2: ['wk-5x5-b', 'wk-hiit', 'wk-5x5-a', 'wk-hiit', null, 'wk-core', null],
+      3: ['wk-5x5-a', 'wk-hiit', 'wk-5x5-b', 'wk-hiit', null, 'wk-core', null],
+      4: ['wk-5x5-b', 'wk-hiit', 'wk-5x5-a', 'wk-hiit', null, 'wk-core', null]
     }
   },
   {
@@ -824,35 +847,23 @@ export const MOCK_PROGRAMS: Program[] = [
     tags: ['Hypertrophy', 'Beginner'],
     image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80',
     schedule: {
-      1: ['wk-upper-power', 'wk-arms', 'wk-core', 'wk-upper-power', 'wk-arms'],
-      2: ['wk-upper-power', 'wk-arms', 'wk-core', 'wk-upper-power', 'wk-arms'],
-      3: ['wk-upper-power', 'wk-arms', 'wk-core', 'wk-upper-power', 'wk-arms'],
-      4: ['wk-upper-power', 'wk-arms', 'wk-core', 'wk-upper-power', 'wk-arms']
-    }
-  },
-  {
-    id: 'pg-glute',
-    title: 'Glute Focus',
-    description: 'Specialized program for lower body development with glute priority.',
-    durationWeeks: 6,
-    tags: ['Hypertrophy', 'Intermediate'],
-    image: 'https://images.unsplash.com/photo-1574680178050-55c6a6a96e0a?auto=format&fit=crop&w=800&q=80',
-    schedule: {
-      1: ['wk-glute', 'wk-upper-power', 'wk-legs', 'wk-mobility'],
-      2: ['wk-glute', 'wk-upper-power', 'wk-legs', 'wk-mobility'],
-      3: ['wk-glute', 'wk-upper-power', 'wk-legs', 'wk-mobility'],
-      4: ['wk-glute', 'wk-upper-power', 'wk-legs', 'wk-mobility']
+      1: ['wk-upper-power', null, 'wk-arms', null, 'wk-core', 'wk-upper-power', null],
+      2: ['wk-upper-power', null, 'wk-arms', null, 'wk-core', 'wk-upper-power', null],
+      3: ['wk-upper-power', null, 'wk-arms', null, 'wk-core', 'wk-upper-power', null],
+      4: ['wk-upper-power', null, 'wk-arms', null, 'wk-core', 'wk-upper-power', null]
     }
   }
 ];
 
 export const MOCK_CLIENTS: Client[] = [
+  // ... existing client data ...
   {
     id: 'cl-1',
     name: 'Sarah Johnson',
     email: 'sarah.j@example.com',
     status: 'Active',
     goal: 'Weight Loss',
+    targetWeight: 65, // Target added
     lastActive: '2023-10-27',
     assignedExercises: [],
     assignedWorkouts: [],
@@ -862,17 +873,52 @@ export const MOCK_CLIENTS: Client[] = [
     gender: 'Female',
     height: 165,
     weight: 70,
+    bodyFat: 28,
+    leanMass: 50.4,
     experienceLevel: 'Intermediate',
     trainingDaysPerWeek: 4,
+    preferredDays: ['Monday', 'Wednesday', 'Friday', 'Saturday'], // New
     injuries: ['Right Knee (Minor)'],
     medicalConditions: ['Asthma'],
-    medications: 'Inhaler prn',
     orthopedicIssues: ['Patellar tendonitis'],
     trainingStylePreference: ['HIIT', 'Strength'],
     environmentPreference: 'Gym',
     stressLevel: 'Medium',
     sleepQuality: 'Good',
-    equipmentAccess: ['Commercial Gym']
+    equipmentAccess: ['Commercial Gym'],
+    measurementHistory: [
+      {
+        date: '2023-10-01',
+        weight: 72,
+        bodyFat: 30,
+        chest: 95,
+        waist: 78,
+        hips: 102,
+        thighLeft: 58,
+        thighRight: 58,
+        armLeft: 29,
+        armRight: 29
+      },
+      {
+        date: '2023-10-15',
+        weight: 70,
+        bodyFat: 28,
+        chest: 94,
+        waist: 76,
+        hips: 100,
+        thighLeft: 57,
+        thighRight: 57,
+        armLeft: 29,
+        armRight: 29
+      }
+    ],
+    intakeFormId: 'q-intake-default',
+    assessmentAnswers: {
+        'g-1': 'Weight loss, Toning and shaping',
+        'h-1': 'I currently exercise regularly',
+        'eq-1': 'Free weights, Gym machines',
+        'av-1': 'Monday, Wednesday, Friday, Saturday'
+    }
   },
   {
     id: 'cl-2',
@@ -892,20 +938,23 @@ export const MOCK_CLIENTS: Client[] = [
     height: 180,
     weight: 82,
     bodyFat: 15,
+    leanMass: 69.7,
     experienceLevel: 'Advanced',
     trainingDaysPerWeek: 5,
+    preferredDays: ['Monday', 'Tuesday', 'Thursday', 'Friday', 'Saturday'],
     injuries: [],
     trainingStylePreference: ['Powerlifting', 'Bodybuilding'],
     environmentPreference: 'Home',
     stressLevel: 'High',
     sleepQuality: 'Fair',
-    equipmentAccess: ['Home Gym']
+    equipmentAccess: ['Home Gym'],
+    measurementHistory: []
   },
   {
     id: 'cl-3',
     name: 'Jessica Davis',
     email: 'jdavis@example.com',
-    status: 'Pending',
+    status: 'Active', 
     goal: 'General Fitness',
     lastActive: 'N/A',
     assignedExercises: [],
@@ -914,8 +963,10 @@ export const MOCK_CLIENTS: Client[] = [
     gender: 'Female',
     height: 162,
     weight: 65,
+    bodyFat: 25,
     experienceLevel: 'Beginner',
     trainingDaysPerWeek: 3,
+    preferredDays: ['Tuesday', 'Thursday', 'Saturday'],
     injuries: ['Lower Back'],
     orthopedicIssues: ['L4-L5 disc bulge'],
     medicalConditions: ['High Blood Pressure'],
@@ -924,6 +975,7 @@ export const MOCK_CLIENTS: Client[] = [
     environmentPreference: 'Home',
     stressLevel: 'Low',
     sleepQuality: 'Poor',
-    equipmentAccess: ['Dumbbells', 'Bands']
+    equipmentAccess: ['Dumbbells', 'Bands'],
+    measurementHistory: []
   }
 ];

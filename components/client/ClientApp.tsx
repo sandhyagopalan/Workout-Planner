@@ -14,9 +14,10 @@ interface ClientAppProps {
   exercises: Exercise[];
   onUpdateClient: (updatedData: Partial<Client>) => void;
   onExit: () => void;
+  goals: string[]; // NEW PROP
 }
 
-const ClientApp: React.FC<ClientAppProps> = ({ client, workouts, programs, exercises, onUpdateClient, onExit }) => {
+const ClientApp: React.FC<ClientAppProps> = ({ client, workouts, programs, exercises, onUpdateClient, onExit, goals }) => {
   const [showOnboarding, setShowOnboarding] = useState(!client.onboardingComplete);
   const [activeTab, setActiveTab] = useState('home');
   const [view, setView] = useState<'dashboard' | 'player' | 'profile'>('dashboard');
@@ -99,7 +100,8 @@ const ClientApp: React.FC<ClientAppProps> = ({ client, workouts, programs, exerc
         <div className="flex items-center justify-center min-h-screen bg-slate-900 p-4">
             <div className="w-full max-w-[400px] h-[850px] bg-white rounded-[3rem] overflow-hidden shadow-2xl border-[8px] border-slate-800 relative ring-4 ring-slate-900/50">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-7 bg-slate-800 rounded-b-xl z-50"></div>
-                <Onboarding client={client} onComplete={handleOnboardingComplete} />
+                {/* PASS DYNAMIC GOALS */}
+                <Onboarding client={client} onComplete={handleOnboardingComplete} goals={goals} />
             </div>
         </div>
     );

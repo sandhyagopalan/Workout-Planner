@@ -393,8 +393,9 @@ const WorkoutPlayer: React.FC<Props> = ({ workout, exercises, onBack, onComplete
         <div className="px-4 pt-16 pb-3 flex items-center justify-between bg-white/95 backdrop-blur-sm z-30 border-b border-slate-100 sticky top-0">
             <button onClick={onBack} className="p-2 text-slate-400 hover:text-slate-800 bg-slate-50 rounded-full"><ArrowLeft size={20} /></button>
             <div className="flex gap-2">
+                <button onClick={() => setShowAICoach(true)} className="flex items-center gap-1.5 px-3 py-2 bg-black text-white rounded-full text-xs font-bold hover:bg-slate-800 transition-all shadow-md"><Camera size={14} className="text-green-400"/> AI Form</button>
                 <button onClick={handleOpenSwap} className="p-2 text-slate-500 bg-slate-50 rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Swap Exercise"><Replace size={20} /></button>
-                <button onClick={() => setShowOverview(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-bold shadow-lg shadow-slate-200 hover:bg-black transition-all active:scale-95"><List size={16} /><span>View Full List</span></button>
+                <button onClick={() => setShowOverview(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-900 rounded-full text-xs font-bold hover:bg-slate-200 transition-all active:scale-95"><List size={16} /><span>List</span></button>
             </div>
         </div>
         
@@ -405,44 +406,29 @@ const WorkoutPlayer: React.FC<Props> = ({ workout, exercises, onBack, onComplete
 
         <div className="flex-1 overflow-y-auto pb-40 scrollbar-hide">
             {/* Media Section */}
-            {hasMedia && (
-                <div className={`relative bg-slate-100 transition-all duration-300 overflow-hidden ${isMediaVisible ? 'h-56' : 'h-12 shrink-0'}`}>
-                   {isMediaVisible ? (
-                       <>
-                         {currentExerciseDef.videoUrl?.includes('mp4') || currentExerciseDef.videoUrl?.includes('blob:') ? <video src={currentExerciseDef.videoUrl} className="w-full h-full object-contain mix-blend-multiply" autoPlay muted loop playsInline /> : <img src={currentExerciseDef.videoUrl} className="w-full h-full object-contain mix-blend-multiply" alt={currentExerciseDef?.name} />}
-                         
-                         {/* AI COACH BUTTON (OVERLAY) */}
-                         <button 
-                            onClick={() => setShowAICoach(true)}
-                            className="absolute top-3 right-3 flex items-center gap-2 bg-black/60 backdrop-blur text-white px-3 py-1.5 rounded-full text-xs font-bold hover:bg-black hover:scale-105 transition-all z-20"
-                         >
-                             <Camera size={14} className="text-green-400" /> Form Check
-                         </button>
-
-                         <button 
-                            onClick={() => setIsMediaVisible(false)}
-                            className="absolute bottom-3 right-3 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg backdrop-blur-sm transition-colors z-10"
-                         >
-                            <Minimize2 size={16} />
-                         </button>
-                       </>
-                   ) : (
-                       <div className="flex h-full">
-                           <button 
-                              onClick={() => setIsMediaVisible(true)}
-                              className="flex-1 flex items-center justify-center gap-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-200 transition-colors"
-                           >
-                              <Maximize2 size={16} />
-                              <span className="text-xs font-bold uppercase tracking-wider">Show Visual</span>
-                           </button>
-                           {/* Minimized Coach Button */}
-                           <button onClick={() => setShowAICoach(true)} className="px-6 bg-black text-white flex items-center justify-center gap-2 text-xs font-bold uppercase hover:bg-slate-800"><Camera size={14} className="text-green-400"/> Check Form</button>
-                       </div>
-                   )}
+            {hasMedia && isMediaVisible && (
+                <div className="relative bg-slate-100 h-56 transition-all duration-300 overflow-hidden shrink-0">
+                     {currentExerciseDef.videoUrl?.includes('mp4') || currentExerciseDef.videoUrl?.includes('blob:') ? <video src={currentExerciseDef.videoUrl} className="w-full h-full object-contain mix-blend-multiply" autoPlay muted loop playsInline /> : <img src={currentExerciseDef.videoUrl} className="w-full h-full object-contain mix-blend-multiply" alt={currentExerciseDef?.name} />}
+                     <button 
+                        onClick={() => setIsMediaVisible(false)}
+                        className="absolute bottom-3 right-3 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-lg backdrop-blur-sm transition-colors z-10"
+                     >
+                        <Minimize2 size={16} />
+                     </button>
+                </div>
+            )}
+            {(!hasMedia || !isMediaVisible) && (
+                <div className="px-6 pt-2 pb-2 flex justify-end">
+                    <button 
+                        onClick={() => setIsMediaVisible(true)}
+                        className="flex items-center gap-2 text-indigo-600 font-bold text-xs bg-indigo-50 px-3 py-1.5 rounded-full"
+                    >
+                        <Maximize2 size={12} /> Show Video
+                    </button>
                 </div>
             )}
 
-            <div className={`px-6 mb-4 ${currentStep.isSuperset ? 'bg-gradient-to-b from-orange-50 to-white border-b border-orange-100 pb-4' : ''} ${hasMedia && isMediaVisible ? 'pt-4' : 'pt-6'}`}>
+            <div className={`px-6 mb-4 ${currentStep.isSuperset ? 'bg-gradient-to-b from-orange-50 to-white border-b border-orange-100 pb-4' : ''} ${hasMedia && isMediaVisible ? 'pt-4' : 'pt-2'}`}>
                 <div className="flex justify-between items-start mb-2">
                     {currentStep.isSuperset ? <div className="flex items-center gap-2 text-orange-600 bg-orange-100 px-3 py-1 rounded-full"><Zap size={12} fill="currentColor" /><span className="font-bold text-[10px] uppercase tracking-wider">Exercise {currentStep.roundIndex} of {currentStep.totalRounds}</span></div> : <span className="font-bold text-slate-400 text-xs uppercase tracking-wider">Set {activeSetIndex + 1} of {currentExerciseData.sets}</span>}
                     {currentExerciseData.restSeconds > 0 && <span className="flex items-center gap-1 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-full"><Clock size={12} /> {currentExerciseData.restSeconds}s</span>}

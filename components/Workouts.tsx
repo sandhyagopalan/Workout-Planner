@@ -12,20 +12,8 @@ interface WorkoutsProps {
   setExercises?: React.Dispatch<React.SetStateAction<Exercise[]>>; // Added optional for AI gen
   clients: Client[];
   programs: Program[];
+  goals: string[]; // NEW PROP
 }
-
-const GOAL_OPTIONS = [
-  "Hypertrophy (Muscle Growth)",
-  "Strength (Max Force)",
-  "Power (Explosive)",
-  "Endurance (Stamina)",
-  "Fat Loss (Metabolic)",
-  "Mobility & Flexibility",
-  "Athletic Performance",
-  "Rehabilitation / Recovery",
-  "Functional Fitness",
-  "CrossFit / Metcon"
-];
 
 const EQUIPMENT_OPTIONS = [
   "Full Commercial Gym",
@@ -38,7 +26,7 @@ const EQUIPMENT_OPTIONS = [
   "Garage Gym Basics"
 ];
 
-const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, setExercises, clients, programs }) => {
+const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, setExercises, clients, programs, goals }) => {
   const [view, setView] = useState<'list' | 'builder' | 'templates' | 'detail'>('list');
   const [isGenerating, setIsGenerating] = useState(false);
   const [viewingTemplate, setViewingTemplate] = useState<any | null>(null);
@@ -69,7 +57,7 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
   const [expandedInstructions, setExpandedInstructions] = useState<Set<string>>(new Set());
 
   // AI Prompt States
-  const [aiGoal, setAiGoal] = useState(GOAL_OPTIONS[0]);
+  const [aiGoal, setAiGoal] = useState(goals[0]); // Initialize with first dynamic goal
   const [aiDiff, setAiDiff] = useState('Intermediate');
   const [aiEquip, setAiEquip] = useState(EQUIPMENT_OPTIONS[0]);
   const [aiContext, setAiContext] = useState(''); // Added custom context
@@ -77,6 +65,13 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
   // DnD Refs
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
+
+  // Update aiGoal if goals prop changes (e.g. from settings)
+  useEffect(() => {
+      if (goals.length > 0 && !goals.includes(aiGoal)) {
+          setAiGoal(goals[0]);
+      }
+  }, [goals]);
 
   // Related Exercises Logic for Builder
   const suggestedExercises = useMemo(() => {
@@ -158,6 +153,18 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
       setViewingWorkout(null);
   };
 
+  const handleDuplicateWorkout = (e: React.MouseEvent, workout: Workout) => {
+      e.stopPropagation();
+      const newWorkout: Workout = {
+          ...workout,
+          id: `wk-${Date.now()}`,
+          title: `${workout.title} (Copy)`,
+          // Deep copy exercises to prevent reference issues
+          exercises: JSON.parse(JSON.stringify(workout.exercises))
+      };
+      setWorkouts(prev => [newWorkout, ...prev]);
+  };
+
   const handleUseTemplate = (template: any) => { setEditingWorkoutId(null); setBuilderTitle(template.title); setBuilderDesc(template.description); setBuilderType(template.type); setBuilderExercises(JSON.parse(JSON.stringify(template.exercises))); setSelectedBuilderIndices(new Set()); setViewingTemplate(null); setView('builder'); }
   const handleAddExerciseToBuilder = (exercise: Exercise) => { const newEx: WorkoutExercise = { exerciseId: exercise.id, sets: 3, reps: '10', restSeconds: 60, notes: '' }; setBuilderExercises([...builderExercises, newEx]); };
   const removeBuilderExercise = (index: number) => { const newList = [...builderExercises]; newList.splice(index, 1); setBuilderExercises(newList); if (selectedBuilderIndices.has(index)) { const newSet = new Set(selectedBuilderIndices); newSet.delete(index); setSelectedBuilderIndices(newSet); } };
@@ -185,7 +192,17 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
     if (inClients) return { used: true, reason: 'Assigned to a Client' };
     return { used: false, reason: '' };
   };
-  const handleDelete = (e: React.MouseEvent, id: string) => { e.stopPropagation(); const check = isWorkoutInUse(id); if (check.used) { alert(`Cannot delete workout: It is currently ${check.reason}.`); return; } if (window.confirm("Are you sure?")) { setWorkouts(prev => prev.filter(w => w.id !== id)); } };
+  const handleDelete = (e: React.MouseEvent, id: string) => { 
+      e.stopPropagation(); 
+      const check = isWorkoutInUse(id); 
+      if (check.used) { 
+          alert(`Cannot delete workout: It is currently ${check.reason}.`); 
+          return; 
+      } 
+      if (window.confirm("Are you sure?")) { 
+          setWorkouts(prev => prev.filter(w => w.id !== id)); 
+      } 
+  };
 
   // --- AI Handlers ---
 
@@ -666,7 +683,7 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
 
   // List View (Default)
   return (
-    <div className="space-y-6 animate-fade-in pb-10 w-full">
+    <div className="space-y-6 animate-fade-in">
         {/* ... Header ... */}
         <div className="flex justify-between items-center"><div><h2 className="text-2xl font-bold text-slate-800">Workouts</h2></div><div className="flex gap-3"><button onClick={handleCreateNew} className="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"><Plus size={18}/> Create New</button></div></div>
 
@@ -677,8 +694,9 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
             <div className="flex-1">
               <h3 className="text-lg font-bold mb-2">Generate with AI</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {/* DYNAMIC GOALS DROPDOWN */}
                 <select value={aiGoal} onChange={e => setAiGoal(e.target.value)} className="bg-white/10 border border-white/20 text-white rounded-lg p-2 text-sm outline-none [&>option]:text-slate-900">
-                    {GOAL_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    {goals.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
                 <select value={aiDiff} onChange={e => setAiDiff(e.target.value)} className="bg-white/10 border border-white/20 text-white rounded-lg p-2 text-sm outline-none [&>option]:text-slate-900">
                     <option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Elite</option>
@@ -710,11 +728,32 @@ const Workouts: React.FC<WorkoutsProps> = ({ workouts, setWorkouts, exercises, s
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             {filteredWorkouts.map(w => (
-                <div key={w.id} onClick={() => { setViewingWorkout(w); setView('detail'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md cursor-pointer overflow-hidden">
+                <div key={w.id} onClick={() => { setViewingWorkout(w); setView('detail'); }} className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md cursor-pointer overflow-hidden group">
                     <div className="h-40 bg-slate-200 relative"><img src={w.image} className="w-full h-full object-cover" alt={w.title}/><div className="absolute top-3 left-3"><span className="px-2 py-1 bg-white/90 text-indigo-600 text-xs font-bold rounded">{w.type}</span></div></div>
-                    <div className="p-4"><h3 className="font-bold text-slate-800">{w.title}</h3><p className="text-sm text-slate-500 line-clamp-2 mt-1">{w.description}</p></div>
+                    <div className="p-4">
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-bold text-slate-800">{w.title}</h3>
+                            <div className="flex gap-1">
+                                <button 
+                                    onClick={(e) => handleDuplicateWorkout(e, w)}
+                                    className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Duplicate Workout"
+                                >
+                                    <Copy size={16} />
+                                </button>
+                                <button 
+                                    onClick={(e) => handleDelete(e, w.id)}
+                                    className="p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Delete Workout"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                        <p className="text-sm text-slate-500 line-clamp-2 mt-1">{w.description}</p>
+                    </div>
                 </div>
             ))}
         </div>

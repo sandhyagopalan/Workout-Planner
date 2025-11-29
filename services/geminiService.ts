@@ -142,12 +142,16 @@ export const generateNewWorkout = async (
   }
 };
 
-export const recommendProgram = async (client: Client, programs: Program[]): Promise<{ recommendedProgramId: string, reasoning: string }> => {
+export const recommendProgram = async (client: Client, programs: Program[]): Promise<{ recommendedProgramId: string, reasoning: string, modifications: string[] }> => {
   try {
     const dynamicAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const programSummaries = programs.map(p => ({ id: p.id, title: p.title, tags: p.tags, duration: p.durationWeeks, description: p.description }));
     
-    // Build rich profile string from new fields
+    // Flatten Intake Form Answers into a readable string
+    const intakeContext = client.assessmentAnswers 
+        ? JSON.stringify(client.assessmentAnswers) 
+        : "No specific intake form answers provided.";
+
     const profile = `
       Name: ${client.name}
       Goal: ${client.goal}
@@ -156,22 +160,19 @@ export const recommendProgram = async (client: Client, programs: Program[]): Pro
       - Experience: ${client.experienceLevel || 'Intermediate'}
       - Frequency: ${client.trainingDaysPerWeek || 3} days/week
       - Equipment: ${client.equipmentAccess ? client.equipmentAccess.join(', ') : 'Standard Gym'}
-      - Age/Gender: ${client.age || 'N/A'} / ${client.gender || 'N/A'}
       
       2. HEALTH & RISK:
       - Injuries: ${client.injuries && client.injuries.length ? client.injuries.join(', ') : 'None'}
       - Conditions: ${client.medicalConditions && client.medicalConditions.length ? client.medicalConditions.join(', ') : 'None'}
-      - Orthopedic: ${client.orthopedicIssues && client.orthopedicIssues.length ? client.orthopedicIssues.join(', ') : 'None'}
       
-      3. BEHAVIORAL:
-      - Preferred Style: ${client.trainingStylePreference ? client.trainingStylePreference.join(', ') : 'Mixed'}
-      - Stress Level: ${client.stressLevel || 'Medium'}
-      - Sleep: ${client.sleepQuality || 'Good'}
+      3. DETAILED INTAKE ANSWERS:
+      ${intakeContext}
     `;
 
     const response = await dynamicAi.models.generateContent({
       model: MODEL_NAME,
-      contents: `Act as an expert personal trainer. Analyze this client profile deeply and recommend the BEST matching program from the available list.
+      contents: `Act as an expert personal trainer. Analyze this client profile and their specific intake form answers deeply.
+      Recommend the BEST matching program from the available list.
       
       CLIENT PROFILE:
       ${profile}
@@ -180,19 +181,21 @@ export const recommendProgram = async (client: Client, programs: Program[]): Pro
       ${JSON.stringify(programSummaries)}
       
       INSTRUCTIONS:
-      1. SAFETY FIRST: Check the Health & Risk layer. (e.g., If 'Low Back Pain', avoid heavy spinal loading programs or warn about them).
-      2. LIFESTYLE MATCH: Check Stress/Sleep. (e.g., High stress/Poor sleep clients should NOT do High Volume/HIIT).
-      3. LOGISTICS: Match Frequency and Equipment.
-      4. GOAL MATCH: Align with primary goal.
+      1. SAFETY FIRST: Scan the 'Injuries' and 'Intake Answers'. If they mention pain (e.g. 'Knee Pain'), you MUST recommend modifications.
+      2. MATCH: Pick the program ID that aligns with Goal + Frequency.
       
-      Return the ID of the best program and a clear, professional reasoning (max 3 sentences) explaining why it fits this specific client's bio-psycho-social profile.`,
+      Return JSON:
+      - recommendedProgramId: string
+      - reasoning: string (Why this fits)
+      - modifications: string[] (List of specific changes the trainer should make. e.g. "Swap Jump Squats for Step Ups due to knee injury", "Reduce volume on Week 1 due to low energy report")`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             recommendedProgramId: { type: Type.STRING },
-            reasoning: { type: Type.STRING }
+            reasoning: { type: Type.STRING },
+            modifications: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["recommendedProgramId", "reasoning"]
         }

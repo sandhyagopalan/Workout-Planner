@@ -6,17 +6,17 @@ import { ArrowRight, Check, ChevronLeft, Activity, Heart, User, Brain, Dumbbell 
 interface OnboardingProps {
   client: Client;
   onComplete: (data: Partial<Client>) => void;
+  goals: string[]; // NEW PROP
 }
 
-const GOALS = ["Weight Loss", "Muscle Gain", "Endurance", "Flexibility", "General Health"];
 const EXPERIENCE = ["Beginner", "Intermediate", "Advanced"];
 const STRESS_LEVELS = ["Low", "Medium", "High"];
 const SLEEP_QUALITY = ["Poor", "Fair", "Good"];
 
-const Onboarding: React.FC<OnboardingProps> = ({ client, onComplete }) => {
+const Onboarding: React.FC<OnboardingProps> = ({ client, onComplete, goals }) => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<Partial<Client>>({
-    goal: client.goal || GOALS[0],
+    goal: client.goal || goals[0],
     age: client.age,
     gender: client.gender,
     height: client.height,
@@ -54,7 +54,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ client, onComplete }) => {
             </div>
             
             <div className="space-y-3">
-              {GOALS.map(g => (
+              {goals.map(g => (
                 <button
                   key={g}
                   onClick={() => updateField('goal', g)}

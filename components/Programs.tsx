@@ -1,8 +1,8 @@
 
 import React, { useState, useRef } from 'react';
-import { Program, Workout, Exercise, WorkoutExercise } from '../types';
+import { Program, Workout, Exercise, WorkoutExercise, Client } from '../types';
 import { PROGRAM_TAGS } from '../constants';
-import { ChevronDown, ChevronUp, ChevronRight, Copy, Plus, Calendar, Settings, Edit, ArrowRight, X, Repeat, Timer, Link2, Unlink, Save, CheckSquare, Square, Trash2, Clock, Search, GripVertical, Info, Dumbbell, ArrowLeft, Eye, LayoutGrid } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Copy, Plus, Calendar, Settings, Edit, ArrowRight, X, Repeat, Timer, Link2, Unlink, Save, CheckSquare, Square, Trash2, Clock, Search, GripVertical, Info, Dumbbell, ArrowLeft, Eye, LayoutGrid, CalendarDays } from 'lucide-react';
 
 interface Props {
   programs: Program[];
@@ -10,21 +10,23 @@ interface Props {
   workouts: Workout[];
   setWorkouts: React.Dispatch<React.SetStateAction<Workout[]>>;
   exercises: Exercise[];
+  clients: Client[];
 }
 
 interface EditingSlot {
     weekNum: number;
-    dayIndex: number;
+    dayIndex: number; // 0-6
     currentWorkoutId: string;
 }
 
 interface AddDayContext {
     weekNum: number;
+    dayIndex: number; // 0-6
 }
 
 type ViewState = 'list' | 'detail' | 'builder';
 
-const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkouts, exercises }) => {
+const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkouts, exercises, clients }) => {
   const [view, setView] = useState<ViewState>('list');
   const [viewingProgram, setViewingProgram] = useState<Program | null>(null);
   
@@ -34,7 +36,8 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
   const [builderDesc, setBuilderDesc] = useState('');
   const [builderDuration, setBuilderDuration] = useState(4);
   const [builderTags, setBuilderTags] = useState<string[]>([]);
-  const [builderSchedule, setBuilderSchedule] = useState<Record<number, string[]>>({});
+  // Use (string | null)[] for 7-day schedule
+  const [builderSchedule, setBuilderSchedule] = useState<Record<number, (string | null)[]>>({});
   const [customTagInput, setCustomTagInput] = useState('');
 
   // Navigation State
@@ -71,6 +74,21 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
       schedule: JSON.parse(JSON.stringify(program.schedule))
     };
     setPrograms(prev => [newProgram, ...prev]);
+  };
+
+  const isProgramInUse = (programId: string) => {
+      return clients.some(c => c.assignedProgramId === programId);
+  };
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      if (isProgramInUse(id)) {
+          alert("Cannot delete program: It is currently assigned to one or more clients.");
+          return;
+      }
+      if (window.confirm("Are you sure you want to delete this program?")) {
+          setPrograms(prev => prev.filter(p => p.id !== id));
+      }
   };
 
   const handleCreateNew = () => {
@@ -122,7 +140,7 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
       setViewingProgram(null);
   };
 
-  const getWorkoutById = (id: string) => workouts.find(w => w.id === id);
+  const getWorkoutById = (id: string | null) => id ? workouts.find(w => w.id === id) : undefined;
   const getExerciseById = (id: string) => exercises.find(e => e.id === id);
 
   // --- Schedule Manipulation (Builder) ---
@@ -142,19 +160,21 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
       setShowEditModal(true);
   };
 
-  const openAddDayModal = (weekNum: number) => {
-      setAddDayContext({ weekNum });
+  const openAddDayModal = (weekNum: number, dayIndex: number) => {
+      setAddDayContext({ weekNum, dayIndex });
       setWorkoutSearchTerm('');
   };
 
   const handleConfirmAddDay = (workoutId: string) => {
       if (!addDayContext) return;
-      const { weekNum } = addDayContext;
-      const currentDays = builderSchedule[weekNum] || [];
+      const { weekNum, dayIndex } = addDayContext;
+      
+      const currentDays = [...(builderSchedule[weekNum] || Array(7).fill(null))];
+      currentDays[dayIndex] = workoutId;
       
       setBuilderSchedule({
           ...builderSchedule,
-          [weekNum]: [...currentDays, workoutId]
+          [weekNum]: currentDays
       });
       setAddDayContext(null);
   };
@@ -162,8 +182,9 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
   const handleRemoveDay = () => {
       if (!editingSlot) return;
       const { weekNum, dayIndex } = editingSlot;
+      
       const currentDays = [...(builderSchedule[weekNum] || [])];
-      currentDays.splice(dayIndex, 1);
+      currentDays[dayIndex] = null; // Set to null instead of splicing to preserve grid
       
       setBuilderSchedule({
           ...builderSchedule,
@@ -221,14 +242,11 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
       const supersetId = `ss-${Date.now()}`;
       const newExercises = [...editedExercises];
       
-      // Extract items and set internal rest to 0
       const selectedItems = indices.map(i => ({ 
           ...newExercises[i], 
           supersetId, 
           restSeconds: 0 
       }));
-      
-      // Set cycle rest for the last item
       selectedItems[selectedItems.length - 1].restSeconds = 90;
       
       for (let i = indices.length - 1; i >= 0; i--) {
@@ -291,8 +309,6 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
       handleSort();
   };
 
-  // --- Save Logic for Day Editor ---
-
   const handleSaveDayChanges = () => {
       if (!editingSlot) return;
 
@@ -303,7 +319,6 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
       let finalWorkoutId = editingSlot.currentWorkoutId;
 
       if ((exercisesChanged || titleChanged) && originalWorkout) {
-          // Create a custom version
           const newWorkoutId = `wk-custom-${Date.now()}`;
           const newWorkout: Workout = {
               ...originalWorkout,
@@ -315,8 +330,8 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
           finalWorkoutId = newWorkoutId;
       }
 
-      // Update Local Builder Schedule
-      const currentDays = [...(builderSchedule[editingSlot.weekNum] || [])];
+      // Preserve array structure
+      const currentDays = [...(builderSchedule[editingSlot.weekNum] || Array(7).fill(null))];
       currentDays[editingSlot.dayIndex] = finalWorkoutId;
       
       setBuilderSchedule({
@@ -342,7 +357,8 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
 
   const renderDetailView = () => {
       if (!viewingProgram) return null;
-      const weeklySchedule = viewingProgram.schedule[currentWeek] || [];
+      // Ensure we have 7 slots filled
+      const weeklySchedule = viewingProgram.schedule[currentWeek] || Array(7).fill(null);
 
       return (
           <div className="space-y-6 animate-fade-in pb-10">
@@ -404,47 +420,52 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
                   </button>
               </div>
 
-              {/* Schedule */}
-              <div className="space-y-4 max-w-4xl mx-auto">
-                  {weeklySchedule.length === 0 ? (
-                      <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-                          <Calendar size={48} className="mx-auto mb-4 opacity-20" />
-                          <p>No workouts scheduled for this week.</p>
-                      </div>
-                  ) : (
-                      weeklySchedule.map((workoutId, index) => {
-                          const workout = getWorkoutById(workoutId);
-                          return (
-                              <div 
-                                key={index} 
-                                onClick={() => workout && setViewingWorkoutId(workout.id)}
-                                className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer flex gap-6 items-center group"
-                              >
-                                  <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 font-bold text-xl group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                      {index + 1}
-                                  </div>
-                                  <div className="flex-1">
-                                      <h3 className="font-bold text-lg text-slate-800 mb-1">{workout?.title || 'Unknown Workout'}</h3>
-                                      <div className="flex items-center gap-4 text-sm text-slate-500">
-                                          <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-bold uppercase">{workout?.type}</span>
-                                          <span className="flex items-center gap-1"><Clock size={14}/> {workout?.durationMinutes}m</span>
-                                          <span className="flex items-center gap-1"><Dumbbell size={14}/> {workout?.exercises.length} Exercises</span>
+              {/* Schedule List (Better than Grid) */}
+              <div className="space-y-3 max-w-4xl mx-auto">
+                  {weeklySchedule.map((workoutId, index) => {
+                      const workout = getWorkoutById(workoutId);
+                      return (
+                          <div key={index} className="flex gap-4 items-stretch">
+                              {/* Day Marker */}
+                              <div className="w-24 shrink-0 flex flex-col items-center justify-center bg-white border border-slate-100 rounded-xl">
+                                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Day {index + 1}</span>
+                              </div>
+
+                              {/* Workout Card */}
+                              {workout ? (
+                                  <div 
+                                    onClick={() => setViewingWorkoutId(workout.id)}
+                                    className="flex-1 bg-white p-4 rounded-xl border border-indigo-100 shadow-sm hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer group flex justify-between items-center"
+                                  >
+                                      <div>
+                                          <div className="flex items-center gap-2 mb-1">
+                                              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded uppercase">{workout.type}</span>
+                                              <span className="text-xs text-slate-400 flex items-center gap-1"><Clock size={12}/> {workout.durationMinutes}m</span>
+                                          </div>
+                                          <h4 className="font-bold text-slate-800 text-lg">{workout.title}</h4>
+                                          <p className="text-sm text-slate-500 line-clamp-1">{workout.description}</p>
+                                      </div>
+                                      <div className="text-indigo-600 bg-indigo-50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all">
+                                          <Eye size={20} />
                                       </div>
                                   </div>
-                                  <div className="p-3 bg-slate-50 rounded-full text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                      <Eye size={20} />
+                              ) : (
+                                  <div className="flex-1 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 flex items-center justify-center">
+                                      <span className="text-slate-400 font-medium flex items-center gap-2"><CalendarDays size={18}/> Rest Day</span>
                                   </div>
-                              </div>
-                          );
-                      })
-                  )}
+                              )}
+                          </div>
+                      );
+                  })}
               </div>
           </div>
       );
   };
 
   const renderBuilderView = () => {
+      // Ensure 7 slots for the week, filling gaps with null
       const currentDays = builderSchedule[currentWeek] || [];
+      const gridDays = Array(7).fill(null).map((_, i) => currentDays[i] || null);
 
       return (
           <div className="h-[calc(100vh-6rem)] flex flex-col animate-fade-in">
@@ -476,7 +497,7 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
 
               <div className="flex-1 flex gap-6 overflow-hidden">
                   {/* LEFT: Metadata */}
-                  <div className="w-1/3 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col overflow-y-auto">
+                  <div className="w-1/3 min-w-[300px] bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col overflow-y-auto">
                       <div className="p-6 space-y-6">
                           <div>
                               <label className="block text-sm font-bold text-slate-700 mb-2">Program Title</label>
@@ -543,9 +564,9 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
                       </div>
                   </div>
 
-                  {/* RIGHT: Schedule Builder */}
+                  {/* RIGHT: Schedule Builder (Vertical List) */}
                   <div className="flex-1 bg-slate-50/50 rounded-xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
-                      <div className="bg-white p-4 border-b border-slate-200 flex justify-between items-center">
+                      <div className="bg-white p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10">
                           <button 
                             onClick={() => setCurrentWeek(prev => Math.max(1, prev - 1))}
                             disabled={currentWeek === 1}
@@ -566,36 +587,69 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
                           </button>
                       </div>
 
-                      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                          {currentDays.map((workoutId, index) => {
-                              const workout = getWorkoutById(workoutId);
-                              return (
-                                  <div key={index} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between group">
-                                      <div className="flex items-center gap-4">
-                                          <div className="bg-slate-100 text-slate-500 font-bold px-3 py-1 rounded text-sm">Day {index + 1}</div>
-                                          <div>
-                                              <h4 className="font-bold text-slate-800">{workout?.title || 'Unknown'}</h4>
-                                              <p className="text-xs text-slate-500">{workout?.type} • {workout?.durationMinutes} mins</p>
+                      <div className="flex-1 overflow-y-auto p-6">
+                          <div className="space-y-4 pb-10">
+                              {gridDays.map((workoutId, index) => {
+                                  const workout = getWorkoutById(workoutId);
+                                  return (
+                                      <div key={index} className="flex gap-4 items-start">
+                                          {/* Day Label */}
+                                          <div className="w-24 pt-3 shrink-0 flex flex-col items-center">
+                                              <div className="text-sm font-black text-slate-400 uppercase tracking-wider">Day {index + 1}</div>
+                                          </div>
+
+                                          {/* Workout Slot */}
+                                          <div className="flex-1">
+                                              {workout ? (
+                                                  <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all group relative flex justify-between items-center">
+                                                      <div className="flex gap-4 items-center">
+                                                          <div className="w-12 h-12 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
+                                                              <Dumbbell size={24} />
+                                                          </div>
+                                                          <div>
+                                                              <h4 className="font-bold text-slate-800 text-lg">{workout.title}</h4>
+                                                              <div className="flex items-center gap-3 mt-1">
+                                                                  <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{workout.type}</span>
+                                                                  <span className="text-xs text-slate-500 flex items-center gap-1"><Clock size={12}/> {workout.durationMinutes} min</span>
+                                                                  <span className="text-xs text-slate-500 flex items-center gap-1"><LayoutGrid size={12}/> {workout.exercises.length} Exercises</span>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                      
+                                                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                          <button 
+                                                              onClick={() => openEditDayModal(currentWeek, index, workout.id)}
+                                                              className="px-3 py-2 bg-slate-50 text-indigo-600 rounded-lg text-sm font-bold hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 transition-colors flex items-center gap-2"
+                                                          >
+                                                              <Edit size={14} /> Edit Session
+                                                          </button>
+                                                          <button 
+                                                              onClick={() => {
+                                                                  setEditingSlot({ weekNum: currentWeek, dayIndex: index, currentWorkoutId: workout.id });
+                                                                  setTimeout(handleRemoveDay, 0);
+                                                              }}
+                                                              className="p-2 bg-white text-red-400 rounded-lg border border-slate-200 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                                          >
+                                                              <Trash2 size={18} />
+                                                          </button>
+                                                      </div>
+                                                  </div>
+                                              ) : (
+                                                  <button 
+                                                      onClick={() => openAddDayModal(currentWeek, index)}
+                                                      className="w-full h-20 border-2 border-dashed border-slate-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50/30 transition-all flex items-center justify-center gap-2 text-slate-400 group"
+                                                  >
+                                                      <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center transition-colors">
+                                                          <Plus size={16} className="text-slate-400 group-hover:text-indigo-600" />
+                                                      </div>
+                                                      <span className="font-medium group-hover:text-indigo-600 transition-colors">Add Workout to Day {index + 1}</span>
+                                                  </button>
+                                              )}
                                           </div>
                                       </div>
-                                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <button 
-                                            onClick={() => openEditDayModal(currentWeek, index, workoutId)}
-                                            className="p-2 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100"
-                                          >
-                                              <Edit size={16} />
-                                          </button>
-                                      </div>
-                                  </div>
-                              );
-                          })}
-                          
-                          <button 
-                            onClick={() => openAddDayModal(currentWeek)}
-                            className="w-full py-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2 font-medium"
-                          >
-                              <Plus size={20} /> Add Workout Day
-                          </button>
+                                  );
+                              })}
+                          </div>
                       </div>
                   </div>
               </div>
@@ -619,37 +673,60 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="flex flex-col gap-4">
           {programs.map(program => (
               <div 
                 key={program.id} 
                 onClick={() => { setViewingProgram(program); setCurrentWeek(1); setView('detail'); }}
-                className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group flex flex-col"
+                className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group flex items-center p-4 gap-6"
               >
-                  <div className="h-48 relative overflow-hidden bg-slate-800">
+                  {/* Thumbnail */}
+                  <div className="w-32 h-24 bg-slate-200 rounded-lg overflow-hidden relative shrink-0">
                       {program.image ? (
-                          <img src={program.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={program.title} />
+                          <img src={program.image} className="w-full h-full object-cover" alt={program.title} />
                       ) : null}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent p-4 flex flex-col justify-end">
-                          <h3 className="text-xl font-bold text-white mb-1">{program.title}</h3>
-                          <div className="flex gap-2">
-                              {program.tags?.slice(0, 3).map(tag => (
-                                  <span key={tag} className="text-[10px] font-bold bg-white/20 backdrop-blur-sm text-white px-2 py-0.5 rounded">{tag}</span>
-                              ))}
-                          </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="font-bold text-slate-800 text-lg leading-tight truncate">{program.title}</h3>
+                        {program.tags?.slice(0, 3).map(tag => (
+                            <span key={tag} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase tracking-wider">{tag}</span>
+                        ))}
+                      </div>
+                      
+                      <p className="text-sm text-slate-500 line-clamp-1 mb-2">{program.description}</p>
+                      
+                      <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
+                          <span className="flex items-center gap-1"><Calendar size={14}/> {program.durationWeeks} Weeks</span>
+                          <span className="flex items-center gap-1"><LayoutGrid size={14}/> {Object.values(program.schedule).flat().filter(Boolean).length} Workouts</span>
                       </div>
                   </div>
-                  <div className="p-4 flex-1 flex flex-col">
-                      <p className="text-sm text-slate-500 line-clamp-2 mb-4 flex-1">{program.description}</p>
-                      <div className="flex justify-between items-center text-xs font-bold text-slate-400 border-t border-slate-100 pt-3">
-                          <span className="flex items-center gap-1"><Calendar size={14}/> {program.durationWeeks} Weeks</span>
-                          <button 
-                            onClick={(e) => handleDuplicate(e, program)}
-                            className="flex items-center gap-1 hover:text-indigo-600 transition-colors"
-                          >
-                              <Copy size={14} /> Duplicate
-                          </button>
-                      </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => handleDuplicate(e, program)}
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-slate-200"
+                        title="Duplicate"
+                      >
+                          <Copy size={18} />
+                      </button>
+                      <button 
+                        onClick={(e) => handleDelete(e, program.id)}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-slate-200"
+                        title="Delete"
+                      >
+                          <Trash2 size={18} />
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleEditProgram(program); }}
+                        className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100"
+                        title="Edit"
+                      >
+                          <Edit size={18} />
+                      </button>
                   </div>
               </div>
           ))}
@@ -747,7 +824,7 @@ const Programs: React.FC<Props> = ({ programs, setPrograms, workouts, setWorkout
                       </div>
                       <div className="flex gap-2">
                         <button onClick={handleRemoveDay} className="px-3 py-2 bg-white rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors flex items-center gap-2">
-                            <Trash2 size={16} /> <span className="text-sm font-medium">Delete Day</span>
+                            <Trash2 size={16} /> <span className="text-sm font-medium">Clear Day</span>
                         </button>
                         <button onClick={() => setShowEditModal(false)} className="p-2 bg-white rounded-lg border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
                             <X size={20} />

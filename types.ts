@@ -53,8 +53,9 @@ export interface Program {
   description: string;
   tags: string[]; // Added tags for categorization
   image?: string; // Added cover image
-  // Map week number (1-based) to list of workout IDs for that week
-  schedule: Record<number, string[]>; 
+  // Map week number (1-based) to list of workout IDs for that week (null = Rest Day)
+  // Index 0 = Day 1, Index 6 = Day 7
+  schedule: Record<number, (string | null)[]>; 
 }
 
 export interface ClientExercise {
@@ -83,6 +84,20 @@ export interface WorkoutLog {
   logs: Record<string, { weight: string; reps: string; completed: boolean }[]>;
 }
 
+export interface BodyMeasurements {
+  date: string;
+  weight?: number;
+  bodyFat?: number;
+  leanMass?: number;
+  chest?: number;
+  waist?: number;
+  hips?: number;
+  thighLeft?: number;
+  thighRight?: number;
+  armLeft?: number;
+  armRight?: number;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -98,21 +113,26 @@ export interface Client {
   
   // --- 1. Core Fitness Profile ---
   goal: string; // Primary Goal
+  targetWeight?: number; // NEW: Specific target
+  
   experienceLevel?: 'Beginner' | 'Intermediate' | 'Advanced';
   trainingDaysPerWeek?: number;
+  preferredDays?: string[]; // Specific days they can train
   equipmentAccess?: string[]; // Gym, Home, Bands, etc.
   age?: number;
   gender?: string;
   height?: number; // cm
-  weight?: number; // kg
-  bodyFat?: number; // %
+  weight?: number; // kg - Current Snapshot
+  bodyFat?: number; // % - Current Snapshot
+  leanMass?: number; // kg - Current Snapshot
+  
+  measurementHistory?: BodyMeasurements[]; // Progress Tracking
 
   // --- 2. Health + Risk Check ---
   injuries?: string[];
   medicalConditions?: string[]; // Diabetes, High BP, Asthma
   orthopedicIssues?: string[]; // Knee pain, Back pain
   surgeries?: string; // "ACL repair 2020"
-  medications?: string; 
   doctorClearance?: boolean;
 
   // --- 3. Behavioral + Personalization ---
@@ -122,6 +142,10 @@ export interface Client {
   sleepQuality?: 'Poor' | 'Fair' | 'Good';
   timeOfDay?: 'Morning' | 'Afternoon' | 'Evening';
   
+  // --- 4. Flexible Assessment ---
+  intakeFormId?: string; // ID of the questionnaire used for deep dive
+  assessmentAnswers?: Record<string, any>; // Map Question ID -> Answer
+
   // General
   notes?: string; 
 }
@@ -135,9 +159,9 @@ export interface Questionnaire {
 export interface Question {
   id: string;
   text: string;
-  type: 'text' | 'number' | 'boolean' | 'select';
-  options?: string[]; // for select
+  type: 'text' | 'number' | 'boolean' | 'select' | 'date' | 'multiselect' | 'textarea';
+  options?: string[]; // for select/multiselect
 }
 
-export type ViewState = 'dashboard' | 'clients' | 'exercises' | 'workouts' | 'programs' | 'questionnaires' | 'wrkout-library';
+export type ViewState = 'dashboard' | 'clients' | 'exercises' | 'workouts' | 'programs' | 'questionnaires' | 'settings' | 'wrkout-library';
 export type AppMode = 'admin' | 'client';

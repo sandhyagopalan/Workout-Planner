@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Client, Program, Workout, Exercise, ClientExercise, WorkoutExercise, ClientWorkout } from '../types';
-import { Mail, MoreHorizontal, Search, UserPlus, ShieldCheck, ArrowLeft, Calendar, Clock, Trophy, CheckCircle2, PlusCircle, X, Dumbbell, ChevronLeft, ChevronRight, LayoutGrid, List, CalendarDays, Info, Timer, Edit2, Save, Sparkles, Loader2, FileText, User, Activity, CalendarCheck, AlertCircle, HeartPulse, Brain, Gauge, Scale } from 'lucide-react';
+import { Client, Program, Workout, Exercise, ClientExercise, WorkoutExercise, ClientWorkout, Questionnaire, BodyMeasurements } from '../types';
+import { Mail, MoreHorizontal, Search, UserPlus, ShieldCheck, ArrowLeft, Calendar, Clock, Trophy, CheckCircle2, PlusCircle, X, Dumbbell, ChevronLeft, ChevronRight, LayoutGrid, List, CalendarDays, Info, Timer, Edit2, Save, Sparkles, Loader2, FileText, User, Activity, CalendarCheck, AlertCircle, HeartPulse, Brain, Gauge, Scale, Target, Trash2, Plus, ClipboardList, Ruler, ArrowRight, Send, Table, ChevronDown, ChevronUp, Link2, Unlink, Repeat, CheckSquare, Square, GripVertical, PenTool } from 'lucide-react';
 import { recommendProgram } from '../services/geminiService';
 
 interface ClientsProps {
@@ -10,9 +10,11 @@ interface ClientsProps {
   programs: Program[];
   workouts: Workout[];
   exercises: Exercise[];
+  questionnaires: Questionnaire[];
+  goals: string[];
 }
 
-type TabState = 'overview' | 'schedule';
+type TabState = 'overview' | 'assessment' | 'schedule';
 type CalendarViewMode = 'month' | 'week';
 
 // Helper type for calendar items
@@ -21,21 +23,21 @@ type CalendarItem =
   | { type: 'client_workout'; data: ClientWorkout }
   | { type: 'exercise'; data: Exercise; meta: ClientExercise };
 
-const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workouts, exercises }) => {
+const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workouts, exercises, questionnaires, goals }) => {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Modal States
   const [showAssignProgramModal, setShowAssignProgramModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showAddClientModal, setShowAddClientModal] = useState(false); 
   const [assignType, setAssignType] = useState<'exercise' | 'workout'>('exercise');
   
   // AI Recommendation State
   const [isRecommending, setIsRecommending] = useState(false);
-  const [aiRecommendation, setAiRecommendation] = useState<{ id: string, reason: string } | null>(null);
+  const [aiRecommendation, setAiRecommendation] = useState<{ id: string, reason: string, modifications?: string[] } | null>(null);
 
-  // Viewing & Editing States
+  // Viewing & Editing States (Calendar)
   const [viewingItem, setViewingItem] = useState<{ item: CalendarItem, date: string } | null>(null);
   const [isEditingWorkout, setIsEditingWorkout] = useState(false);
   const [editedExercises, setEditedExercises] = useState<WorkoutExercise[]>([]);
@@ -44,18 +46,42 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
   // Calendar States
   const [activeTab, setActiveTab] = useState<TabState>('overview');
   const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>('week');
-  const [currentDate, setCurrentDate] = useState(new Date()); // Cursor for calendar navigation
+  const [currentDate, setCurrentDate] = useState(new Date()); 
   const [selectedDateForAssignment, setSelectedDateForAssignment] = useState<string>('');
   const [programStartDateInput, setProgramStartDateInput] = useState<string>('');
 
   // Assignment Form States
-  const [selectedId, setSelectedId] = useState(''); // ID of exercise or workout to assign
+  const [selectedId, setSelectedId] = useState(''); 
   const [assignmentNote, setAssignmentNote] = useState('');
   const [assignmentSets, setAssignmentSets] = useState('3');
   const [assignmentReps, setAssignmentReps] = useState('10');
 
-  // Profile Edit Form
-  const [editProfileData, setEditProfileData] = useState<Partial<Client>>({});
+  // Assessment / Consultation Form State
+  const [isAssessmentEditing, setIsAssessmentEditing] = useState(false);
+  const [assessmentData, setAssessmentData] = useState<Partial<Client>>({});
+  const [showIntakeDetails, setShowIntakeDetails] = useState(false);
+  
+  // Measurement Editing State
+  const [editingMeasurementIndex, setEditingMeasurementIndex] = useState<number | null>(null);
+  const [measurementEditData, setMeasurementEditData] = useState<Partial<BodyMeasurements>>({});
+  const [showAddMeasurementModal, setShowAddMeasurementModal] = useState(false);
+  const [newMeasurementData, setNewMeasurementData] = useState<Partial<BodyMeasurements>>({
+      date: new Date().toISOString().split('T')[0]
+  });
+  
+  // Flexible Questionnaire Assessment State
+  const [selectedIntakeFormId, setSelectedIntakeFormId] = useState('q-intake-default'); // Default to comprehensive
+  const [tempAssessmentAnswers, setTempAssessmentAnswers] = useState<Record<string, any>>({});
+
+  // New Client Form State
+  const [newClientData, setNewClientData] = useState<Partial<Client>>({
+    name: '',
+    email: '',
+    status: 'Active', 
+    goal: goals[0], 
+    experienceLevel: 'Beginner',
+    trainingDaysPerWeek: 3
+  });
 
   const filteredClients = clients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -68,283 +94,186 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
     setProgramStartDateInput(new Date().toISOString().split('T')[0]);
   }, []);
 
-  // --- Helpers ---
+  // Sync assessment data when client changes or tab opens
+  useEffect(() => {
+      if (selectedClient) {
+          setAssessmentData({ ...selectedClient });
+          setSelectedIntakeFormId(selectedClient.intakeFormId || 'q-intake-default');
+          setTempAssessmentAnswers(selectedClient.assessmentAnswers || {});
+          setEditingMeasurementIndex(null);
+      }
+  }, [selectedClient, activeTab]);
 
-  const getStartOfWeek = (date: Date) => {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(d.setDate(diff));
-  };
-
+  const getStartOfWeek = (date: Date) => { const d = new Date(date); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); return new Date(d.setDate(diff)); };
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
-
-  const getExerciseName = (id: string) => {
-    return exercises.find(e => e.id === id)?.name || 'Unknown Exercise';
-  };
-
-  const calculateBMI = (height?: number, weight?: number) => {
-      if (!height || !weight) return null;
-      const heightM = height / 100;
-      return (weight / (heightM * heightM)).toFixed(1);
-  };
-
-  const getCalendarDays = () => {
-    const days = [];
-    if (calendarViewMode === 'week') {
-      const start = getStartOfWeek(currentDate);
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(start);
-        d.setDate(start.getDate() + i);
-        days.push(d);
-      }
-    } else {
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth();
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      
-      const startPadding = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
-      for (let i = startPadding; i > 0; i--) {
-        const d = new Date(year, month, 1 - i);
-        days.push(d);
-      }
-      for (let i = 1; i <= lastDay.getDate(); i++) {
-        days.push(new Date(year, month, i));
-      }
-      const remaining = 42 - days.length;
-      for (let i = 1; i <= remaining; i++) {
-        const d = new Date(year, month + 1, i);
-        days.push(d);
-      }
-    }
-    return days;
-  };
-
-  // Resolve what items are on a specific date
+  const getExerciseName = (id: string) => { return exercises.find(e => e.id === id)?.name || 'Unknown Exercise'; };
+  const getWorkoutName = (id: string) => { return workouts.find(w => w.id === id)?.title || 'Unknown Workout'; };
+  
+  const getCalendarDays = () => { const days = []; if (calendarViewMode === 'week') { const start = getStartOfWeek(currentDate); for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(d); } } else { const year = currentDate.getFullYear(); const month = currentDate.getMonth(); const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0); const startPadding = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; for (let i = startPadding; i > 0; i--) { const d = new Date(year, month, 1 - i); days.push(d); } for (let i = 1; i <= lastDay.getDate(); i++) { days.push(new Date(year, month, i)); } const remaining = 42 - days.length; for (let i = 1; i <= remaining; i++) { const d = new Date(year, month + 1, i); days.push(d); } } return days; };
+  
   const getItemsForDate = (dateStr: string): CalendarItem[] => {
     if (!selectedClient) return [];
     const items: CalendarItem[] = [];
-
-    // 1. Ad-hoc Workouts (ClientWorkouts)
-    if (selectedClient.assignedWorkouts) {
-      selectedClient.assignedWorkouts.forEach(cw => {
-        if (cw.assignedDate === dateStr) {
-          items.push({ type: 'client_workout', data: cw });
-        }
-      });
-    }
-
-    // 2. Program Workouts
-    if (selectedClient.assignedProgramId && selectedClient.programStartDate) {
-      const program = programs.find(p => p.id === selectedClient.assignedProgramId);
-      if (program) {
-        const start = new Date(selectedClient.programStartDate);
-        const current = new Date(dateStr);
-        // Reset times for accurate day diff
-        start.setHours(0,0,0,0);
-        current.setHours(0,0,0,0);
-        
-        const diffTime = current.getTime() - start.getTime();
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)); 
-        
-        if (diffDays >= 0) {
-          const weekNum = Math.floor(diffDays / 7) + 1;
-          const dayIndex = diffDays % 7; 
-          
-          const weekWorkouts = program.schedule[weekNum] || [];
-          
-          let workoutId = null;
-          if (weekWorkouts.length > 0) {
-              // Simple distribution logic: Mon (0), Wed (2), Fri (4) get workouts if available
-              if (dayIndex === 0 && weekWorkouts[0]) workoutId = weekWorkouts[0];
-              else if (dayIndex === 2 && weekWorkouts[1]) workoutId = weekWorkouts[1];
-              else if (dayIndex === 4 && weekWorkouts[2]) workoutId = weekWorkouts[2];
-              // Fallback fill for heavy programs
-              else if (weekWorkouts.length > 3 && dayIndex % 2 !== 0 && weekWorkouts[3]) workoutId = weekWorkouts[3]; 
-          }
-
-          if (workoutId) {
-            const w = workouts.find(wk => wk.id === workoutId);
-            if (w) items.push({ type: 'program_workout', data: w, programTitle: program.title });
-          }
-        }
-      }
-    }
-
-    // 3. Ad-hoc Exercises
-    if (selectedClient.assignedExercises) {
-      selectedClient.assignedExercises.forEach(ex => {
-        if (ex.assignedDate === dateStr) {
-          const exerciseDef = exercises.find(e => e.id === ex.exerciseId);
-          if (exerciseDef) items.push({ type: 'exercise', data: exerciseDef, meta: ex });
-        }
-      });
-    }
-
+    if (selectedClient.assignedWorkouts) { selectedClient.assignedWorkouts.forEach(cw => { if (cw.assignedDate === dateStr) { items.push({ type: 'client_workout', data: cw }); } }); }
+    if (selectedClient.assignedProgramId && selectedClient.programStartDate) { const program = programs.find(p => p.id === selectedClient.assignedProgramId); if (program) { const start = new Date(selectedClient.programStartDate); const current = new Date(dateStr); start.setHours(0,0,0,0); current.setHours(0,0,0,0); const diffTime = current.getTime() - start.getTime(); const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)); if (diffDays >= 0) { const weekNum = Math.floor(diffDays / 7) + 1; const dayIndex = diffDays % 7; const weekWorkouts = program.schedule[weekNum] || []; let workoutId = null; if (weekWorkouts.length > 0) { if (dayIndex === 0 && weekWorkouts[0]) workoutId = weekWorkouts[0]; else if (dayIndex === 2 && weekWorkouts[1]) workoutId = weekWorkouts[1]; else if (dayIndex === 4 && weekWorkouts[2]) workoutId = weekWorkouts[2]; else if (weekWorkouts.length > 3 && dayIndex % 2 !== 0 && weekWorkouts[3]) workoutId = weekWorkouts[3]; } if (workoutId) { const w = workouts.find(wk => wk.id === workoutId); if (w) items.push({ type: 'program_workout', data: w, programTitle: program.title }); } } } }
+    if (selectedClient.assignedExercises) { selectedClient.assignedExercises.forEach(ex => { if (ex.assignedDate === dateStr) { const exerciseDef = exercises.find(e => e.id === ex.exerciseId); if (exerciseDef) items.push({ type: 'exercise', data: exerciseDef, meta: ex }); } }); }
     return items;
   };
 
-  // --- Actions ---
-
-  const handleOpenAssignProgram = () => {
-      if (!programStartDateInput) {
-          setProgramStartDateInput(new Date().toISOString().split('T')[0]);
-      }
-      setAiRecommendation(null);
-      setShowAssignProgramModal(true);
-  }
-
-  const handleGetAiRecommendation = async () => {
-      if (!selectedClient) return;
-      setIsRecommending(true);
-      try {
-          const rec = await recommendProgram(selectedClient, programs);
-          setAiRecommendation({ id: rec.recommendedProgramId, reason: rec.reasoning });
-      } catch (e) {
-          alert("Could not generate recommendation");
-      } finally {
-          setIsRecommending(false);
-      }
-  };
-
-  const handleAssignProgram = (programId: string) => {
-    if (!selectedClientId) return;
-    const startDate = programStartDateInput || new Date().toISOString().split('T')[0];
-    setClients(prev => prev.map(c => 
-      c.id === selectedClientId ? { ...c, assignedProgramId: programId, programStartDate: startDate } : c
-    ));
-    setShowAssignProgramModal(false);
-    setAiRecommendation(null); // Clear recommendation after assignment
-  };
-
-  const handleOpenAssignModal = (dateStr: string, type: 'exercise' | 'workout') => {
-    setSelectedDateForAssignment(dateStr);
-    setAssignType(type);
-    setShowAssignModal(true);
-    setSelectedId('');
-    setAssignmentNote('');
-    setAssignmentSets('3');
-    setAssignmentReps('10');
-  };
-
-  const handleConfirmAssignment = () => {
-    if (!selectedClientId || !selectedId) return;
-
-    if (assignType === 'exercise') {
-        const newAssignment: ClientExercise = {
-            id: `ce-${Date.now()}`,
-            exerciseId: selectedId,
-            assignedDate: selectedDateForAssignment,
-            notes: assignmentNote,
-            sets: parseInt(assignmentSets) || 3,
-            reps: assignmentReps,
-            completed: false
-        };
-        setClients(prev => prev.map(c => 
-            c.id === selectedClientId ? { 
-              ...c, 
-              assignedExercises: [...(c.assignedExercises || []), newAssignment] 
-            } : c
-        ));
-    } else {
-        // Assigning a workout
-        const workoutTemplate = workouts.find(w => w.id === selectedId);
-        if (workoutTemplate) {
-            const newClientWorkout: ClientWorkout = {
-                id: `cw-${Date.now()}`,
-                workoutId: workoutTemplate.id,
-                title: workoutTemplate.title,
-                assignedDate: selectedDateForAssignment,
-                completed: false,
-                notes: assignmentNote,
-                // Create a snapshot of exercises
-                exercises: workoutTemplate.exercises.map(e => ({...e})) 
-            };
-
-            setClients(prev => prev.map(c => 
-                c.id === selectedClientId ? { 
-                  ...c, 
-                  assignedWorkouts: [...(c.assignedWorkouts || []), newClientWorkout] 
-                } : c
-            ));
-        }
-    }
-
-    setShowAssignModal(false);
-  };
-
-  const handleOpenEditProfile = () => {
-      if (!selectedClient) return;
-      setEditProfileData({ ...selectedClient });
-      setShowEditProfileModal(true);
-  };
-
-  const handleSaveProfile = () => {
-      if (!selectedClientId) return;
-      setClients(prev => prev.map(c => c.id === selectedClientId ? { ...c, ...editProfileData } : c));
-      setShowEditProfileModal(false);
-  };
-
-  const handleOpenViewItem = (item: CalendarItem, date: string) => {
-      setViewingItem({ item, date });
-      setIsEditingWorkout(false);
-      
-      // Pre-load edit state
-      if (item.type === 'program_workout') {
-          setEditedExercises(item.data.exercises.map(e => ({...e})));
-          setEditedNotes('');
-      } else if (item.type === 'client_workout') {
-          setEditedExercises(item.data.exercises.map(e => ({...e})));
-          setEditedNotes(item.data.notes || '');
-      }
-  };
-
-  const handleSaveWorkoutChanges = () => {
-      if (!viewingItem || !selectedClientId) return;
-      const { item, date } = viewingItem;
-      if (item.type === 'program_workout') {
-          const newClientWorkout: ClientWorkout = {
-              id: `cw-${Date.now()}`,
-              workoutId: item.data.id,
-              title: `${item.data.title} (Edited)`,
-              assignedDate: date,
-              completed: false,
-              notes: editedNotes,
-              exercises: editedExercises
-          };
-          setClients(prev => prev.map(c => c.id === selectedClientId ? { ...c, assignedWorkouts: [...(c.assignedWorkouts || []), newClientWorkout] } : c));
+  const handleOpenAssignProgram = () => { 
+      if (!programStartDateInput) { 
+          setProgramStartDateInput(new Date().toISOString().split('T')[0]); 
       } 
-      else if (item.type === 'client_workout') {
-          setClients(prev => prev.map(c => c.id === selectedClientId ? { ...c, assignedWorkouts: (c.assignedWorkouts || []).map(cw => cw.id === item.data.id ? { ...cw, exercises: editedExercises, notes: editedNotes } : cw) } : c));
-      }
-      setViewingItem(null);
-      setIsEditingWorkout(false);
+      setAiRecommendation(null); 
+      setShowAssignProgramModal(true); 
   };
-  const updateEditedExercise = (index: number, field: keyof WorkoutExercise, value: any) => {
-      const updated = [...editedExercises];
-      updated[index] = { ...updated[index], [field]: value };
-      setEditedExercises(updated);
+
+  const handleOpenAddMeasurement = () => {
+      setNewMeasurementData({ date: new Date().toISOString().split('T')[0] });
+      setShowAddMeasurementModal(true);
   };
-  const removeEditedExercise = (index: number) => {
-      const updated = [...editedExercises];
-      updated.splice(index, 1);
-      setEditedExercises(updated);
-  }
-  const addExerciseToEdit = () => {
-      if (exercises.length > 0) {
-        setEditedExercises([...editedExercises, { exerciseId: exercises[0].id, sets: 3, reps: '10', restSeconds: 60, notes: '' }]);
+
+  const handleGetAiRecommendation = async () => { 
+      if (!selectedClient) return; 
+      setIsRecommending(true); 
+      try { 
+          const rec = await recommendProgram(selectedClient, programs); 
+          setAiRecommendation({ id: rec.recommendedProgramId, reason: rec.reasoning, modifications: rec.modifications }); 
+      } catch (e) { 
+          alert("Could not generate recommendation"); 
+      } finally { 
+          setIsRecommending(false); 
+      } 
+  };
+
+  const handleAssignProgram = (programId: string) => { if (!selectedClientId) return; const startDate = programStartDateInput || new Date().toISOString().split('T')[0]; setClients(prev => prev.map(c => c.id === selectedClientId ? { ...c, assignedProgramId: programId, programStartDate: startDate } : c)); setShowAssignProgramModal(false); setAiRecommendation(null); };
+  const handleOpenAssignModal = (dateStr: string, type: 'exercise' | 'workout') => { setSelectedDateForAssignment(dateStr); setAssignType(type); setShowAssignModal(true); setSelectedId(''); setAssignmentNote(''); setAssignmentSets('3'); setAssignmentReps('10'); };
+  const handleConfirmAssignment = () => { if (!selectedClientId || !selectedId) return; if (assignType === 'exercise') { const newAssignment: ClientExercise = { id: `ce-${Date.now()}`, exerciseId: selectedId, assignedDate: selectedDateForAssignment, notes: assignmentNote, sets: parseInt(assignmentSets) || 3, reps: assignmentReps, completed: false }; setClients(prev => prev.map(c => c.id === selectedClientId ? { ...c, assignedExercises: [...(c.assignedExercises || []), newAssignment] } : c)); } else { const workoutTemplate = workouts.find(w => w.id === selectedId); if (workoutTemplate) { const newClientWorkout: ClientWorkout = { id: `cw-${Date.now()}`, workoutId: workoutTemplate.id, title: workoutTemplate.title, assignedDate: selectedDateForAssignment, completed: false, notes: assignmentNote, exercises: workoutTemplate.exercises.map(e => ({...e})) }; setClients(prev => prev.map(c => c.id === selectedClientId ? { ...c, assignedWorkouts: [...(c.assignedWorkouts || []), newClientWorkout] } : c)); } } setShowAssignModal(false); };
+  
+  const handleCustomizeProgram = (programId: string) => {
+      alert(`In a real app, this would open Program "${programs.find(p=>p.id===programId)?.title}" in the Builder for customization.`);
+  };
+
+  const handleSaveAssessment = () => { 
+      if (!selectedClientId) return; 
+      setClients(prev => prev.map(c => {
+          if (c.id === selectedClientId) {
+              return { 
+                  ...c, 
+                  ...assessmentData, 
+                  intakeFormId: selectedIntakeFormId, 
+                  assessmentAnswers: tempAssessmentAnswers,
+              };
+          }
+          return c;
+      })); 
+      setIsAssessmentEditing(false); 
+  };
+
+  const handleToggleDay = (day: string) => {
+      const currentDays = assessmentData.preferredDays || [];
+      const newDays = currentDays.includes(day) 
+          ? currentDays.filter(d => d !== day)
+          : [...currentDays, day];
+      setAssessmentData({ ...assessmentData, preferredDays: newDays });
+  };
+
+  const handleEditMeasurement = (index: number, data: BodyMeasurements) => {
+      setEditingMeasurementIndex(index);
+      setMeasurementEditData({...data});
+  };
+
+  const handleSaveMeasurementEdit = () => {
+      if (editingMeasurementIndex === null || !selectedClient) return;
+      const realIndex = (selectedClient.measurementHistory || []).length - 1 - editingMeasurementIndex;
+      const newHistory = [...(selectedClient.measurementHistory || [])];
+      newHistory[realIndex] = { ...newHistory[realIndex], ...measurementEditData };
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, measurementHistory: newHistory } : c));
+      setEditingMeasurementIndex(null);
+      setMeasurementEditData({});
+  };
+
+  const handleAddMeasurement = () => {
+      if (!selectedClient) return;
+      const entry: BodyMeasurements = {
+          date: newMeasurementData.date || new Date().toISOString().split('T')[0],
+          ...newMeasurementData
+      };
+      const newHistory = [...(selectedClient.measurementHistory || []), entry];
+      newHistory.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, measurementHistory: newHistory } : c));
+      setShowAddMeasurementModal(false);
+      setNewMeasurementData({ date: new Date().toISOString().split('T')[0] });
+  };
+
+  const handleDeleteMeasurement = (visualIndex: number) => {
+      if (!selectedClient) return;
+      if (!window.confirm("Are you sure you want to delete this entry?")) return;
+      const realIndex = (selectedClient.measurementHistory || []).length - 1 - visualIndex;
+      const newHistory = [...(selectedClient.measurementHistory || [])];
+      newHistory.splice(realIndex, 1);
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, measurementHistory: newHistory } : c));
+  };
+  
+  const handleOpenViewItem = (item: CalendarItem, date: string) => { 
+      setViewingItem({ item, date }); 
+      setIsEditingWorkout(false); 
+      if (item.type === 'program_workout') { 
+          setEditedExercises(item.data.exercises.map(e => ({...e}))); 
+          setEditedNotes(''); 
+      } else if (item.type === 'client_workout') { 
+          setEditedExercises(item.data.exercises.map(e => ({...e}))); 
+          setEditedNotes(item.data.notes || ''); 
+      } 
+  };
+
+  const handleSaveWorkoutChanges = () => { 
+      if (!viewingItem || !selectedClientId) return; 
+      const { item, date } = viewingItem; 
+      
+      if (item.type === 'program_workout') { 
+          const newClientWorkout: ClientWorkout = { 
+              id: `cw-${Date.now()}`, 
+              workoutId: item.data.id, 
+              title: `${item.data.title} (Edited)`, 
+              assignedDate: date, 
+              completed: false, 
+              notes: editedNotes, 
+              exercises: editedExercises 
+          }; 
+          setClients(prev => prev.map(c => c.id === selectedClientId ? { ...c, assignedWorkouts: [...(c.assignedWorkouts || []), newClientWorkout] } : c)); 
+      } else if (item.type === 'client_workout') { 
+          setClients(prev => prev.map(c => c.id === selectedClientId ? { 
+              ...c, 
+              assignedWorkouts: (c.assignedWorkouts || []).map(cw => cw.id === item.data.id ? { ...cw, exercises: editedExercises, notes: editedNotes } : cw) 
+          } : c)); 
+      } 
+      setViewingItem(null); 
+      setIsEditingWorkout(false); 
+  };
+  
+  const handleAddNewClient = () => { if (!newClientData.name || !newClientData.email) { alert("Name and email are required"); return; } const newClient: Client = { id: `cl-${Date.now()}`, name: newClientData.name || 'New Client', email: newClientData.email || '', status: 'Active', goal: newClientData.goal || 'Not Set', lastActive: 'Never', assignedExercises: [], assignedWorkouts: [], experienceLevel: 'Beginner', trainingDaysPerWeek: 3, injuries: [], medicalConditions: [], orthopedicIssues: [], equipmentAccess: [], measurementHistory: [] }; setClients(prev => [...prev, newClient]); setShowAddClientModal(false); setNewClientData({ name: '', email: '', status: 'Active' }); };
+
+  const handleSendAssessment = () => {
+      alert(`Intake form "${questionnaires.find(q=>q.id===selectedIntakeFormId)?.title}" sent to ${selectedClient?.name}!`);
+      if (selectedClient && selectedIntakeFormId) {
+          setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, intakeFormId: selectedIntakeFormId } : c));
       }
   }
 
-  // --- Render ---
-  if (selectedClient) {
+  const currentWeight = selectedClient?.weight || 0;
+  const currentFat = selectedClient?.bodyFat || 0;
+  const currentLeanMass = currentWeight * (1 - (currentFat/100));
+  const currentBMI = (currentWeight / Math.pow((selectedClient?.height || 170)/100, 2)).toFixed(1);
+
+  const renderDetailView = () => {
+    if (!selectedClient) return null;
     const activeProgram = programs.find(p => p.id === selectedClient.assignedProgramId);
-    const bmi = calculateBMI(selectedClient.height, selectedClient.weight);
-    
+
     return (
-      <div className="space-y-6 animate-fade-in pb-10">
-        {/* ... Existing Header & Tabs Code ... */}
+      <div className="space-y-6 pb-10 animate-fade-in">
+        {/* Header */}
         <div className="flex items-center gap-4">
           <button onClick={() => setSelectedClientId(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500">
             <ArrowLeft size={20} />
@@ -361,432 +290,438 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, programs, workou
 
         <div className="border-b border-slate-200 flex gap-8">
             <button onClick={() => setActiveTab('overview')} className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'overview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Overview</button>
+            <button onClick={() => setActiveTab('assessment')} className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'assessment' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Assessment & Intake</button>
             <button onClick={() => setActiveTab('schedule')} className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'schedule' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Schedule & Calendar</button>
         </div>
 
+        {/* Overview Content */}
         {activeTab === 'overview' && (
             <div className="animate-fade-in space-y-6">
-                {/* Quick Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Goal</div><div className="flex items-center gap-2 text-indigo-600"><Trophy size={16} /><span className="font-semibold">{selectedClient.goal}</span></div></div>
-                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Program Status</div><div className="flex items-center gap-2 text-emerald-600"><ShieldCheck size={16} /><span className="font-semibold truncate">{activeProgram ? `Week 2 of ${activeProgram.durationWeeks}` : 'None'}</span></div></div>
-                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Compliance</div><div className="flex items-center gap-2 text-slate-700"><CheckCircle2 size={16} /><span className="font-semibold">92%</span></div></div>
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Primary Objective</div><div className="flex items-center gap-2 text-indigo-600"><Trophy size={16} /><span className="font-semibold">{selectedClient.goal || 'Pending Assessment'}</span></div></div>
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Target</div><div className="flex items-center gap-2 text-slate-700"><Target size={16} /><span className="font-semibold">{selectedClient.targetWeight ? `${selectedClient.targetWeight} kg` : 'Not Set'}</span></div></div>
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Health Flags</div><div className="flex items-center gap-2 text-red-600"><AlertCircle size={16} /><span className="font-semibold">{selectedClient.injuries?.length || 0} Reported</span></div></div>
                     <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Last Active</div><div className="flex items-center gap-2 text-slate-700"><Clock size={16} /><span className="font-semibold">{selectedClient.lastActive || 'Never'}</span></div></div>
                 </div>
-
-                {/* RICH PROFILE GRID */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Column 1: Core & Bio */}
-                    <div className="lg:col-span-1 space-y-6">
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-bold text-slate-800 flex items-center gap-2"><User size={18} className="text-slate-400"/> Fitness Profile</h3>
-                                <button onClick={handleOpenEditProfile} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline">Edit</button>
-                            </div>
-                            <div className="space-y-3 text-sm">
-                                <div><div className="text-slate-400 text-xs">Primary Goal</div><div className="font-medium text-indigo-600">{selectedClient.goal}</div></div>
-                                <div className="grid grid-cols-2 gap-4 py-2 border-b border-slate-50">
-                                    <div><div className="text-slate-400 text-xs">Age</div><div className="font-medium">{selectedClient.age || '-'}</div></div>
-                                    <div><div className="text-slate-400 text-xs">Gender</div><div className="font-medium">{selectedClient.gender || '-'}</div></div>
-                                    <div><div className="text-slate-400 text-xs">Height</div><div className="font-medium">{selectedClient.height ? `${selectedClient.height}cm` : '-'}</div></div>
-                                    <div><div className="text-slate-400 text-xs">Weight</div><div className="font-medium">{selectedClient.weight ? `${selectedClient.weight}kg` : '-'}</div></div>
+                {/* AI Matchmaker Section */}
+                <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100 shadow-sm p-6">
+                    <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2"><Sparkles size={20} className="text-indigo-600"/> AI Program Matchmaker</h3>
+                            <p className="text-sm text-indigo-700 mt-1">Analyzes the <strong>Goals and Health Risks</strong> from the Assessment to find the safest fit.</p>
+                        </div>
+                        <button onClick={handleGetAiRecommendation} disabled={isRecommending} className="px-4 py-2 bg-white text-indigo-600 font-bold rounded-lg shadow-sm border border-indigo-100 hover:bg-indigo-50 disabled:opacity-70 flex items-center gap-2 transition-colors">
+                            {isRecommending ? <Loader2 className="animate-spin" size={16}/> : <Sparkles size={16}/>} Run Analysis
+                        </button>
+                    </div>
+                    {aiRecommendation ? (
+                        <div className="bg-white rounded-xl p-4 border border-indigo-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                            <div className="flex gap-4">
+                                <div className="w-24 h-24 bg-slate-100 rounded-lg shrink-0 overflow-hidden hidden sm:block relative">
+                                    {programs.find(p => p.id === aiRecommendation.id)?.image ? (
+                                        <img src={programs.find(p => p.id === aiRecommendation.id)?.image} className="w-full h-full object-cover" alt="Program Cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-300"><ShieldCheck size={32} /></div>
+                                    )}
+                                    <div className="absolute inset-0 bg-indigo-900/10"></div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4 py-2 border-b border-slate-50 bg-slate-50/50 rounded p-2">
-                                    <div><div className="text-slate-400 text-xs">BMI</div><div className="font-medium">{bmi || '-'}</div></div>
-                                    <div><div className="text-slate-400 text-xs">Body Fat</div><div className="font-medium">{selectedClient.bodyFat ? `${selectedClient.bodyFat}%` : '-'}</div></div>
-                                </div>
-                                <div><div className="text-slate-400 text-xs">Experience Level</div><div className="font-medium">{selectedClient.experienceLevel || 'Beginner'}</div></div>
-                                <div><div className="text-slate-400 text-xs">Availability</div><div className="font-medium">{selectedClient.trainingDaysPerWeek || 3} Days / Week</div></div>
-                                <div>
-                                    <div className="text-slate-400 text-xs mb-1">Equipment Access</div>
-                                    <div className="flex flex-wrap gap-1">
-                                        {selectedClient.equipmentAccess?.length ? selectedClient.equipmentAccess.map(e => <span key={e} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200">{e}</span>) : <span className="text-slate-400 italic">Not specified</span>}
+                                <div className="flex-1">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h4 className="font-bold text-slate-800 text-lg">{programs.find(p => p.id === aiRecommendation.id)?.title || 'Unknown Program'}</h4>
+                                                <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Best Match</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                {programs.find(p => p.id === aiRecommendation.id)?.durationWeeks} Weeks • {programs.find(p => p.id === aiRecommendation.id)?.tags?.join(', ') || 'General'}
+                                            </p>
+                                        </div>
+                                        <button onClick={() => handleAssignProgram(aiRecommendation.id)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all whitespace-nowrap">Assign Program</button>
+                                    </div>
+                                    <div className="mt-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-sm text-indigo-800 italic flex gap-2 items-start">
+                                        <Sparkles size={14} className="mt-0.5 shrink-0 opacity-70" />
+                                        <span className="leading-relaxed">{aiRecommendation.reason}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4"><Brain size={18} className="text-purple-400"/> Behavioral & Lifestyle</h3>
-                            <div className="space-y-3 text-sm">
-                                <div><div className="text-slate-400 text-xs">Stress Level</div><div className={`font-medium ${selectedClient.stressLevel === 'High' ? 'text-red-500' : 'text-slate-700'}`}>{selectedClient.stressLevel || '-'}</div></div>
-                                <div><div className="text-slate-400 text-xs">Sleep Quality</div><div className="font-medium">{selectedClient.sleepQuality || '-'}</div></div>
-                                <div><div className="text-slate-400 text-xs mb-1">Preferred Style</div><div className="text-slate-700">{selectedClient.trainingStylePreference?.join(', ') || 'Any'}</div></div>
-                                <div><div className="text-slate-400 text-xs">Environment</div><div className="font-medium">{selectedClient.environmentPreference || 'Any'}</div></div>
-                            </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-32 text-center text-indigo-300 border-2 border-dashed border-indigo-100 rounded-xl bg-white/50">
+                            <Gauge size={24} className="mb-2 opacity-50"/>
+                            <span className="text-sm font-medium">Ready to analyze client profile</span>
                         </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'assessment' && (
+            <div className="animate-fade-in space-y-8">
+                 <div className="bg-gradient-to-r from-indigo-900 to-indigo-800 rounded-xl p-6 text-white shadow-lg">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h3 className="text-lg font-bold flex items-center gap-2"><Brain size={20} className="text-cyan-400"/> Program Strategy</h3>
+                            <p className="text-indigo-200 text-sm mt-1">Generate a plan based on Intake Answers & Injuries.</p>
+                        </div>
+                        <button onClick={handleGetAiRecommendation} disabled={isRecommending} className="px-4 py-2 bg-white text-indigo-900 font-bold rounded-lg shadow hover:bg-indigo-50 disabled:opacity-70 flex items-center gap-2 transition-colors">
+                            {isRecommending ? <Loader2 className="animate-spin" size={16}/> : <Sparkles size={16}/>} Generate Plan
+                        </button>
                     </div>
 
-                    {/* Column 2: Health & AI */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4"><HeartPulse size={18} className="text-red-400"/> Health & Safety Check</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Injuries & Orthopedic</span>
-                                    {selectedClient.injuries?.length || selectedClient.orthopedicIssues?.length ? (
-                                        <div className="flex flex-wrap gap-2">
-                                            {selectedClient.injuries?.map(i => <span key={i} className="px-2 py-1 bg-red-50 text-red-600 border border-red-100 rounded text-xs font-medium flex items-center gap-1"><AlertCircle size={10}/> {i}</span>)}
-                                            {selectedClient.orthopedicIssues?.map(i => <span key={i} className="px-2 py-1 bg-orange-50 text-orange-600 border border-orange-100 rounded text-xs font-medium">{i}</span>)}
+                    {aiRecommendation && (
+                        <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 animate-in fade-in slide-in-from-top-2">
+                            <div className="flex gap-4 items-start">
+                                <div className="w-16 h-16 bg-indigo-500/30 rounded-lg flex items-center justify-center shrink-0">
+                                    <ShieldCheck size={28} className="text-cyan-300"/>
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Recommended</div>
+                                            <h4 className="text-xl font-bold text-white">{programs.find(p => p.id === aiRecommendation.id)?.title || 'Custom Plan'}</h4>
                                         </div>
-                                    ) : <span className="text-sm text-slate-400 italic">No reported issues</span>}
-                                </div>
-                                <div>
-                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Medical Conditions</span>
-                                    {selectedClient.medicalConditions?.length ? (
-                                        <div className="flex flex-wrap gap-2">
-                                            {selectedClient.medicalConditions.map(c => <span key={c} className="px-2 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded text-xs font-medium">{c}</span>)}
-                                        </div>
-                                    ) : <span className="text-sm text-slate-400 italic">None reported</span>}
-                                </div>
-                            </div>
-                            {(selectedClient.surgeries || selectedClient.medications) && (
-                                <div className="mt-4 pt-4 border-t border-slate-50 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                    {selectedClient.surgeries && <div><span className="text-slate-400 text-xs block">Surgeries</span><span className="text-slate-700">{selectedClient.surgeries}</span></div>}
-                                    {selectedClient.medications && <div><span className="text-slate-400 text-xs block">Medications</span><span className="text-slate-700">{selectedClient.medications}</span></div>}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* AI Matchmaker */}
-                        <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100 shadow-sm p-6">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
-                                        <Sparkles size={20} className="text-indigo-600"/>
-                                        AI Program Matchmaker
-                                    </h3>
-                                    <p className="text-sm text-indigo-700 mt-1">
-                                        Analyzes <strong>Goals, Health Risks, and Lifestyle</strong> to find the safest fit.
-                                    </p>
-                                </div>
-                                <button 
-                                    onClick={handleGetAiRecommendation}
-                                    disabled={isRecommending}
-                                    className="px-4 py-2 bg-white text-indigo-600 font-bold rounded-lg shadow-sm border border-indigo-100 hover:bg-indigo-50 disabled:opacity-70 flex items-center gap-2 transition-colors"
-                                >
-                                    {isRecommending ? <Loader2 className="animate-spin" size={16}/> : <Sparkles size={16}/>}
-                                    Run Analysis
-                                </button>
-                            </div>
-
-                            {aiRecommendation ? (
-                                <div className="bg-white rounded-xl p-4 border border-indigo-200 shadow-sm animate-in fade-in slide-in-from-top-2">
-                                    <div className="flex gap-4">
-                                        <div className="w-24 h-24 bg-slate-100 rounded-lg shrink-0 overflow-hidden hidden sm:block relative">
-                                            {programs.find(p => p.id === aiRecommendation.id)?.image ? (
-                                                <img src={programs.find(p => p.id === aiRecommendation.id)?.image} className="w-full h-full object-cover" alt="Program Cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-slate-300"><ShieldCheck size={32} /></div>
-                                            )}
-                                            <div className="absolute inset-0 bg-indigo-900/10"></div>
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <h4 className="font-bold text-slate-800 text-lg">{programs.find(p => p.id === aiRecommendation.id)?.title || 'Unknown Program'}</h4>
-                                                        <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Best Match</span>
-                                                    </div>
-                                                    <p className="text-xs text-slate-500 mt-1">
-                                                        {programs.find(p => p.id === aiRecommendation.id)?.durationWeeks} Weeks • {programs.find(p => p.id === aiRecommendation.id)?.tags?.join(', ') || 'General'}
-                                                    </p>
-                                                </div>
-                                                <button 
-                                                    onClick={() => handleAssignProgram(aiRecommendation.id)}
-                                                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all whitespace-nowrap"
-                                                >
-                                                    Assign Program
-                                                </button>
-                                            </div>
-                                            <div className="mt-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-sm text-indigo-800 italic flex gap-2 items-start">
-                                                <Sparkles size={14} className="mt-0.5 shrink-0 opacity-70" />
-                                                <span className="leading-relaxed">{aiRecommendation.reason}</span>
-                                            </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setAiRecommendation(null)} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors">Reject</button>
+                                            <button onClick={() => handleCustomizeProgram(aiRecommendation.id)} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"><PenTool size={12}/> Customize</button>
+                                            <button onClick={() => handleAssignProgram(aiRecommendation.id)} className="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-indigo-900 rounded-lg text-xs font-bold transition-colors shadow-lg">Approve & Assign</button>
                                         </div>
                                     </div>
+                                    <div className="mt-3 space-y-2">
+                                        <div className="text-sm text-indigo-100 italic bg-black/20 p-2 rounded border-l-2 border-cyan-400">"{aiRecommendation.reason}"</div>
+                                        {aiRecommendation.modifications && aiRecommendation.modifications.length > 0 && (
+                                            <div>
+                                                <div className="text-xs font-bold text-orange-300 uppercase tracking-wider mb-1 mt-2">Safety Modifications</div>
+                                                <ul className="text-xs text-white/90 list-disc pl-4 space-y-0.5">
+                                                    {aiRecommendation.modifications.map((mod, i) => <li key={i}>{mod}</li>)}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-32 text-center text-indigo-300 border-2 border-dashed border-indigo-100 rounded-xl bg-white/50">
-                                    <Gauge size={24} className="mb-2 opacity-50"/>
-                                    <span className="text-sm font-medium">Ready to analyze client profile</span>
-                                </div>
-                            )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><ClipboardList size={24} className="text-indigo-600"/> Assessment & Intake</h3>
+                        <p className="text-sm text-slate-500">Manage biometrics and view intake responses.</p>
+                    </div>
+                    {isAssessmentEditing ? (
+                        <div className="flex gap-3">
+                            <button onClick={() => setIsAssessmentEditing(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg">Cancel</button>
+                            <button onClick={handleSaveAssessment} className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-md"><Save size={18}/> Save Changes</button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setIsAssessmentEditing(true)} className="px-6 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 flex items-center gap-2"><Edit2 size={18}/> Edit Bio-Metrics</button>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div className="lg:col-span-3 bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+                        <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2"><Scale size={18} className="text-cyan-500"/> Bio-Metrics & Physics</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Height (cm)</label>{isAssessmentEditing ? <input type="number" className="w-full p-2 border rounded bg-slate-50 text-lg font-bold" value={assessmentData.height || ''} onChange={e => setAssessmentData({...assessmentData, height: parseInt(e.target.value)})} /> : <div className="text-2xl font-black text-slate-800">{selectedClient.height}</div>}</div>
+                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Current Weight (kg)</label>{isAssessmentEditing ? <input type="number" className="w-full p-2 border rounded bg-slate-50 text-lg font-bold" value={assessmentData.weight || ''} onChange={e => setAssessmentData({...assessmentData, weight: parseFloat(e.target.value)})} /> : <div className="text-2xl font-black text-slate-800">{selectedClient.weight}</div>}</div>
+                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Body Fat %</label>{isAssessmentEditing ? <input type="number" className="w-full p-2 border rounded bg-slate-50 text-lg font-bold" value={assessmentData.bodyFat || ''} onChange={e => setAssessmentData({...assessmentData, bodyFat: parseFloat(e.target.value)})} /> : <div className="text-2xl font-black text-slate-800">{selectedClient.bodyFat || '-'}%</div>}</div>
+                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Target Weight (kg)</label>{isAssessmentEditing ? <input type="number" className="w-full p-2 border rounded bg-slate-50 text-lg font-bold" value={assessmentData.targetWeight || ''} onChange={e => setAssessmentData({...assessmentData, targetWeight: parseFloat(e.target.value)})} /> : <div className="text-2xl font-black text-indigo-600">{selectedClient.targetWeight || '-'}</div>}</div>
+                        </div>
+                        <div className="mt-6 pt-6 border-t border-slate-100 flex gap-8">
+                            <div><span className="text-xs text-slate-400 font-bold uppercase">BMI</span><div className="text-xl font-bold text-slate-700">{currentBMI}</div></div>
+                            <div><span className="text-xs text-slate-400 font-bold uppercase">Lean Mass</span><div className="text-xl font-bold text-slate-700">{currentLeanMass.toFixed(1)} kg</div></div>
+                            <div><span className="text-xs text-slate-400 font-bold uppercase">Fat Mass</span><div className="text-xl font-bold text-slate-700">{(currentWeight - currentLeanMass).toFixed(1)} kg</div></div>
                         </div>
                     </div>
+                    <div className="bg-indigo-900 rounded-xl p-6 text-white flex flex-col justify-between shadow-lg">
+                        <div><div className="text-indigo-300 text-xs font-bold uppercase mb-2">Primary Goal</div><div className="text-xl font-bold">{selectedClient.goal}</div></div>
+                        <div><div className="text-indigo-300 text-xs font-bold uppercase mb-2">Training Age</div><div className="text-xl font-bold">{selectedClient.experienceLevel}</div></div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2"><Calendar size={18} className="text-emerald-500"/> Logistics & Availability</h4>
+                    <div className="flex flex-col md:flex-row gap-8">
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Frequency</label>
+                            {isAssessmentEditing ? (
+                                <div className="flex items-center gap-3"><input type="range" min="1" max="7" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-emerald-500" value={assessmentData.trainingDaysPerWeek || 3} onChange={e => setAssessmentData({...assessmentData, trainingDaysPerWeek: parseInt(e.target.value)})} /><span className="font-bold text-slate-800 w-12 text-center">{assessmentData.trainingDaysPerWeek} Days</span></div>
+                            ) : <div className="text-xl font-bold text-slate-800">{selectedClient.trainingDaysPerWeek} Days / Week</div>}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
+                    <div className="flex justify-between items-center mb-6">
+                        <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2"><Table size={18} className="text-orange-500"/> Measurements History</h4>
+                        <button type="button" onClick={handleOpenAddMeasurement} className="flex items-center gap-2 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 px-3 py-2 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer select-none"><Plus size={14}/> Log Manual Entry</button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-slate-500 uppercase bg-slate-50"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Weight (kg)</th><th className="px-4 py-3">Body Fat (%)</th><th className="px-4 py-3">Chest (cm)</th><th className="px-4 py-3">Waist (cm)</th><th className="px-4 py-3">Hips (cm)</th><th className="px-4 py-3">L Thigh (cm)</th><th className="px-4 py-3">R Thigh (cm)</th><th className="px-4 py-3">L Arm (cm)</th><th className="px-4 py-3">R Arm (cm)</th><th className="px-4 py-3 text-right">Actions</th></tr></thead>
+                            <tbody>
+                                {selectedClient.measurementHistory && selectedClient.measurementHistory.length > 0 ? (
+                                    [...selectedClient.measurementHistory].reverse().map((m, i) => {
+                                        const isEditing = editingMeasurementIndex === i;
+                                        return (
+                                            <tr key={i} className={`border-b border-slate-100 transition-colors ${isEditing ? 'bg-orange-50' : 'hover:bg-slate-50'}`}>
+                                                <td className="px-4 py-3 font-medium text-slate-900">{m.date}</td>
+                                                {isEditing ? (
+                                                    <>
+                                                        <td className="px-2 py-3"><input type="number" className="w-16 p-1 border rounded bg-white" value={measurementEditData.weight ?? ''} onChange={e=>setMeasurementEditData({...measurementEditData, weight: parseFloat(e.target.value) || 0})} /></td>
+                                                        <td className="px-2 py-3"><input type="number" className="w-16 p-1 border rounded bg-white" value={measurementEditData.bodyFat ?? ''} onChange={e=>setMeasurementEditData({...measurementEditData, bodyFat: parseFloat(e.target.value) || 0})} /></td>
+                                                        <td className="px-2 py-3"><input type="number" className="w-12 p-1 border rounded bg-white" value={measurementEditData.chest ?? ''} onChange={e=>setMeasurementEditData({...measurementEditData, chest: parseFloat(e.target.value) || 0})} /></td>
+                                                        <td className="px-2 py-3"><input type="number" className="w-12 p-1 border rounded bg-white" value={measurementEditData.waist ?? ''} onChange={e=>setMeasurementEditData({...measurementEditData, waist: parseFloat(e.target.value) || 0})} /></td>
+                                                        <td className="px-2 py-3"><input type="number" className="w-12 p-1 border rounded bg-white" value={measurementEditData.hips ?? ''} onChange={e=>setMeasurementEditData({...measurementEditData, hips: parseFloat(e.target.value) || 0})} /></td>
+                                                        <td className="px-2 py-3"><input type="number" className="w-12 p-1 border rounded bg-white" value={measurementEditData.thighLeft ?? ''} onChange={e=>setMeasurementEditData({...measurementEditData, thighLeft: parseFloat(e.target.value) || 0})} /></td>
+                                                        <td className="px-2 py-3"><input type="number" className="w-12 p-1 border rounded bg-white" value={measurementEditData.thighRight ?? ''} onChange={e=>setMeasurementEditData({...measurementEditData, thighRight: parseFloat(e.target.value) || 0})} /></td>
+                                                        <td className="px-2 py-3"><input type="number" className="w-12 p-1 border rounded bg-white" value={measurementEditData.armLeft ?? ''} onChange={e=>setMeasurementEditData({...measurementEditData, armLeft: parseFloat(e.target.value) || 0})} /></td>
+                                                        <td className="px-2 py-3"><input type="number" className="w-12 p-1 border rounded bg-white" value={measurementEditData.armRight ?? ''} onChange={e=>setMeasurementEditData({...measurementEditData, armRight: parseFloat(e.target.value) || 0})} /></td>
+                                                        <td className="px-4 py-3 text-right flex justify-end gap-2"><button onClick={handleSaveMeasurementEdit} className="text-green-600 hover:text-green-800 bg-green-50 p-1 rounded"><CheckCircle2 size={16}/></button><button onClick={() => setEditingMeasurementIndex(null)} className="text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded"><X size={16}/></button></td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="px-4 py-3">{m.weight}</td><td className="px-4 py-3">{m.bodyFat}%</td><td className="px-4 py-3">{m.chest || '-'}</td><td className="px-4 py-3">{m.waist || '-'}</td><td className="px-4 py-3">{m.hips || '-'}</td><td className="px-4 py-3">{m.thighLeft || '-'}</td><td className="px-4 py-3">{m.thighRight || '-'}</td><td className="px-4 py-3">{m.armLeft || '-'}</td><td className="px-4 py-3">{m.armRight || '-'}</td>
+                                                        <td className="px-4 py-3 text-right flex justify-end gap-2"><button onClick={() => handleEditMeasurement(i, m)} className="text-indigo-600 hover:text-indigo-800 p-1.5 rounded hover:bg-indigo-50"><Edit2 size={16}/></button><button onClick={() => handleDeleteMeasurement(i)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50"><Trash2 size={16}/></button></td>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        );
+                                    })
+                                ) : <tr><td colSpan={11} className="px-4 py-4 text-center text-slate-400 italic">No measurement history recorded yet.</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-violet-500"></div>
+                    <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2"><FileText size={18} className="text-violet-500"/> Intake Form Responses</h4>
+                        <div className="flex items-center gap-3">
+                            {isAssessmentEditing && (
+                                <select className="text-xs p-2 border rounded bg-slate-50 outline-none w-48" value={selectedIntakeFormId} onChange={(e) => setSelectedIntakeFormId(e.target.value)}>{questionnaires.map(q => (<option key={q.id} value={q.id}>{q.title}</option>))}</select>
+                            )}
+                            <button onClick={() => setShowIntakeDetails(!showIntakeDetails)} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg">{showIntakeDetails ? 'Hide Responses' : 'Show Responses'} {showIntakeDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>
+                        </div>
+                    </div>
+                    {showIntakeDetails && (
+                        <div className="mt-6 pt-6 border-t border-slate-100 animate-in slide-in-from-top-4 fade-in">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                                {(() => {
+                                    const activeFormId = isAssessmentEditing ? selectedIntakeFormId : selectedClient.intakeFormId;
+                                    const activeForm = questionnaires.find(q => q.id === activeFormId);
+                                    if (!activeForm) return <div className="text-sm text-slate-400 italic col-span-2">No questionnaire attached.</div>;
+                                    return activeForm.questions.map((q) => (
+                                        <div key={q.id} className="border-b border-slate-50 pb-3 last:border-0">
+                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">{q.text}</p>
+                                            {isAssessmentEditing ? (
+                                                q.type === 'textarea' ? <textarea className="w-full p-2 border rounded text-sm bg-slate-50" rows={2} value={tempAssessmentAnswers[q.id] || ''} onChange={(e) => setTempAssessmentAnswers({...tempAssessmentAnswers, [q.id]: e.target.value})} /> :
+                                                q.type === 'multiselect' ? (
+                                                    <div className="flex flex-wrap gap-2">{q.options?.map(opt => (<button key={opt} onClick={() => { const current = (tempAssessmentAnswers[q.id] || '').split(', ').filter(Boolean); const exists = current.includes(opt); const newValue = exists ? current.filter((c:string) => c !== opt) : [...current, opt]; setTempAssessmentAnswers({...tempAssessmentAnswers, [q.id]: newValue.join(', ')}); }} className={`px-2 py-1 text-xs border rounded ${((tempAssessmentAnswers[q.id] || '').includes(opt)) ? 'bg-violet-100 border-violet-200 text-violet-700' : 'bg-white border-slate-200 text-slate-500'}`}>{opt}</button>))}</div>
+                                                ) : q.type === 'select' ? (
+                                                    <select className="w-full p-2 border rounded text-sm bg-slate-50" value={tempAssessmentAnswers[q.id] || ''} onChange={(e) => setTempAssessmentAnswers({...tempAssessmentAnswers, [q.id]: e.target.value})}>{q.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>
+                                                ) : <input type="text" className="w-full p-2 border rounded text-sm bg-slate-50" value={tempAssessmentAnswers[q.id] || ''} onChange={(e) => setTempAssessmentAnswers({...tempAssessmentAnswers, [q.id]: e.target.value})} />
+                                            ) : <p className="text-sm font-medium text-slate-800">{tempAssessmentAnswers[q.id] || assessmentData.assessmentAnswers?.[q.id] || '-'}</p>}
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                            <div className="mt-4 flex justify-end"><button onClick={handleSendAssessment} className="px-4 py-2 bg-violet-100 text-violet-700 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-violet-200 transition-colors"><Send size={14} /> Send Form to Client App</button></div>
+                        </div>
+                    )}
                 </div>
             </div>
         )}
 
         {activeTab === 'schedule' && (
-             <div className="animate-fade-in flex flex-col h-[800px]">
-                 {/* ... Existing Calendar Header ... */}
-                 <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-                    <div className="flex items-center gap-4 bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
-                        <button onClick={() => setCalendarViewMode('month')} className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${calendarViewMode === 'month' ? 'bg-indigo-600 text-white' : 'text-slate-600'}`}><CalendarDays size={16} /> Month</button>
-                        <button onClick={() => setCalendarViewMode('week')} className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${calendarViewMode === 'week' ? 'bg-indigo-600 text-white' : 'text-slate-600'}`}><LayoutGrid size={16} /> Week</button>
-                    </div>
-                    <div className="flex items-center gap-4">
-                         <div className="flex items-center bg-white rounded-lg border border-slate-200 shadow-sm">
-                             <button onClick={() => { const newDate = new Date(currentDate); if (calendarViewMode === 'week') newDate.setDate(newDate.getDate() - 7); else newDate.setMonth(newDate.getMonth() - 1); setCurrentDate(newDate); }} className="p-2 hover:bg-slate-50"><ChevronLeft size={18} /></button>
-                             <span className="px-4 text-sm font-semibold text-slate-800 min-w-[140px] text-center">{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-                             <button onClick={() => { const newDate = new Date(currentDate); if (calendarViewMode === 'week') newDate.setDate(newDate.getDate() + 7); else newDate.setMonth(newDate.getMonth() + 1); setCurrentDate(newDate); }} className="p-2 hover:bg-slate-50"><ChevronRight size={18} /></button>
+            <div className="animate-fade-in space-y-6 relative z-0">
+                 <div className="flex justify-between items-center mb-4 relative z-10">
+                     <div className="flex gap-2">
+                         <button onClick={() => setCalendarViewMode('week')} className={`px-3 py-1 rounded-lg text-sm font-medium ${calendarViewMode === 'week' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'}`}>Week</button>
+                         <button onClick={() => setCalendarViewMode('month')} className={`px-3 py-1 rounded-lg text-sm font-medium ${calendarViewMode === 'month' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'}`}>Month</button>
+                     </div>
+                     <div className="flex items-center gap-4">
+                         <button type="button" onClick={handleOpenAssignProgram} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-md transition-colors active:scale-95 cursor-pointer select-none"><CalendarCheck size={16} /> Assign Program</button>
+                         <div className="flex items-center gap-2 border-l border-slate-200 pl-4">
+                             <button onClick={() => setCurrentDate(new Date(currentDate.setDate(currentDate.getDate() - (calendarViewMode === 'week' ? 7 : 30))))} className="p-1 hover:bg-slate-100 rounded"><ChevronLeft size={20}/></button>
+                             <span className="font-bold text-slate-800 w-32 text-center">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                             <button onClick={() => setCurrentDate(new Date(currentDate.setDate(currentDate.getDate() + (calendarViewMode === 'week' ? 7 : 30))))} className="p-1 hover:bg-slate-100 rounded"><ChevronRight size={20}/></button>
                          </div>
-                         <button onClick={handleOpenAssignProgram} className="text-sm text-indigo-600 font-medium hover:underline">{activeProgram ? 'Change Program' : 'Assign Program'}</button>
-                    </div>
-                </div>
-
-                {/* Calendar Body - Reuse Existing Logic */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex-1 flex flex-col overflow-hidden">
-                    <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                            <div key={d} className="py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">{d}</div>
-                        ))}
-                    </div>
-                    <div className={`grid grid-cols-7 flex-1 ${calendarViewMode === 'week' ? '' : 'grid-rows-6'}`}>
-                        {getCalendarDays().map((day, idx) => {
-                            const dateStr = formatDate(day);
-                            const isToday = dateStr === formatDate(new Date());
-                            const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                            const items = getItemsForDate(dateStr);
-                            return (
-                                <div key={idx} className={`border-b border-r border-slate-100 p-2 min-h-[100px] relative group hover:bg-slate-50/50 transition-colors ${!isCurrentMonth && calendarViewMode === 'month' ? 'bg-slate-50/30 text-slate-400' : 'bg-white'}`}>
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>{day.getDate()}</span>
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                            <button onClick={() => handleOpenAssignModal(dateStr, 'workout')} title="Add Workout" className="w-6 h-6 rounded hover:bg-indigo-100 text-indigo-600 flex items-center justify-center"><PlusCircle size={12} /></button>
-                                            <button onClick={() => handleOpenAssignModal(dateStr, 'exercise')} title="Add Exercise" className="w-6 h-6 rounded hover:bg-emerald-100 text-emerald-600 flex items-center justify-center"><Dumbbell size={12} /></button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        {items.map((item, i) => (
-                                            <div key={i}>
-                                                {(item.type === 'program_workout' || item.type === 'client_workout') && (
-                                                    <div onClick={() => handleOpenViewItem(item, dateStr)} className={`border rounded p-1.5 cursor-pointer transition-colors group/item ${item.type === 'client_workout' ? 'bg-purple-50 border-purple-100 hover:bg-purple-100' : 'bg-indigo-50 border-indigo-100 hover:bg-indigo-100'}`}>
-                                                        <div className="flex items-center justify-between mb-0.5"><div className="flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${item.type === 'client_workout' ? 'bg-purple-500' : 'bg-indigo-500'}`}></span><span className={`text-[10px] font-bold uppercase tracking-tight ${item.type === 'client_workout' ? 'text-purple-700' : 'text-indigo-700'}`}>{item.type === 'client_workout' ? 'Custom' : 'Program'}</span></div></div>
-                                                        <p className="text-xs font-semibold text-slate-800 truncate">{item.data.title}</p>
-                                                    </div>
-                                                )}
-                                                {item.type === 'exercise' && (
-                                                    <div className="bg-emerald-50 border border-emerald-100 rounded p-1.5 hover:bg-emerald-100 cursor-pointer"><div className="flex items-center gap-1 mb-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span className="text-[10px] font-bold text-emerald-700 uppercase tracking-tight">Extra</span></div><p className="text-xs font-semibold text-slate-800 truncate">{item.data.name}</p></div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-             </div>
-        )}
-
-        {/* MODALS (View/Edit, Assign Modal, etc.) - Reusing existing code structure */}
-        {viewingItem && (viewingItem.item.type === 'program_workout' || viewingItem.item.type === 'client_workout') && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-                    {/* ... View/Edit Modal Content ... */}
-                     <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50"><div><div className="flex items-center gap-2 mb-1"><span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${viewingItem.item.type === 'client_workout' ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'}`}>{(viewingItem.item.data as Workout | ClientWorkout).id.startsWith('cw-') ? 'Custom Session' : 'Template Session'}</span><span className="text-slate-400">•</span><span className="text-xs font-medium text-slate-500">{viewingItem.date}</span></div><h3 className="text-2xl font-bold text-slate-900">{isEditingWorkout && viewingItem.item.type === 'program_workout' ? `Editing: ${viewingItem.item.data.title}` : viewingItem.item.data.title}</h3></div><div className="flex gap-2">{!isEditingWorkout && (<button onClick={() => setIsEditingWorkout(true)} className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-indigo-600 hover:border-indigo-200 transition-all flex items-center gap-2"><Edit2 size={16} /> <span className="text-sm font-medium">Edit</span></button>)}<button onClick={() => setViewingItem(null)} className="p-2 bg-white rounded-full shadow-sm text-slate-400 hover:text-slate-600 hover:bg-slate-100"><X size={20} /></button></div></div>
-                     <div className="p-0 overflow-y-auto flex-1 bg-white">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-slate-50 sticky top-0 z-10"><tr><th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">Exercise</th><th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 w-20">Sets</th><th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 w-24">Reps</th><th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 w-24">Rest</th><th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">Notes</th>{isEditingWorkout && <th className="px-6 py-3 border-b border-slate-200 w-10"></th>}</tr></thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {(isEditingWorkout ? editedExercises : viewingItem.item.data.exercises).map((ex, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4">{isEditingWorkout ? (<select className="w-full p-1 border rounded text-sm" value={ex.exerciseId} onChange={(e) => updateEditedExercise(idx, 'exerciseId', e.target.value)}>{exercises.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>) : (<div className="font-medium text-slate-900">{getExerciseName(ex.exerciseId)}</div>)}</td>
-                                        <td className="px-6 py-4">{isEditingWorkout ? (<input type="number" className="w-16 p-1 border rounded text-sm" value={ex.sets} onChange={(e) => updateEditedExercise(idx, 'sets', parseInt(e.target.value))} />) : <span className="text-slate-600 font-medium">{ex.sets}</span>}</td>
-                                        <td className="px-6 py-4">{isEditingWorkout ? (<input type="text" className="w-20 p-1 border rounded text-sm" value={ex.reps} onChange={(e) => updateEditedExercise(idx, 'reps', e.target.value)} />) : <span className="text-slate-600 font-medium">{ex.reps}</span>}</td>
-                                        <td className="px-6 py-4">{isEditingWorkout ? (<input type="number" className="w-16 p-1 border rounded text-sm" value={ex.restSeconds} onChange={(e) => updateEditedExercise(idx, 'restSeconds', parseInt(e.target.value))} />) : (<div className="flex items-center gap-1 text-slate-500 text-sm"><Timer size={14} /> {ex.restSeconds}s</div>)}</td>
-                                        <td className="px-6 py-4 text-sm text-slate-500 italic">{isEditingWorkout ? (<input type="text" className="w-full p-1 border rounded text-sm" value={ex.notes || ''} onChange={(e) => updateEditedExercise(idx, 'notes', e.target.value)} />) : (ex.notes || '-')}</td>
-                                        {isEditingWorkout && (<td className="px-6 py-4"><button onClick={() => removeEditedExercise(idx)} className="text-red-400 hover:text-red-600"><X size={16}/></button></td>)}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {isEditingWorkout && <div className="p-4"><button onClick={addExerciseToEdit} className="w-full py-2 border-2 border-dashed border-slate-200 text-slate-400 rounded-lg hover:border-indigo-300 hover:text-indigo-600 transition-all font-medium text-sm flex items-center justify-center gap-2"><PlusCircle size={16} /> Add Exercise</button></div>}
-                    </div>
-                    <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">{isEditingWorkout ? (<><button onClick={() => setIsEditingWorkout(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button><button onClick={handleSaveWorkoutChanges} className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"><Save size={18} /> Save Changes</button></>) : (<button onClick={() => setViewingItem(null)} className="px-6 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors">Close</button>)}</div>
-                </div>
+                     </div>
+                 </div>
+                 <div className="grid grid-cols-7 gap-4 relative z-0">
+                     {getCalendarDays().map((day, i) => {
+                         const dateStr = formatDate(day);
+                         const isToday = dateStr === new Date().toISOString().split('T')[0];
+                         const items = getItemsForDate(dateStr);
+                         return (
+                             <div key={i} className={`min-h-[100px] border border-slate-100 rounded-xl p-2 bg-white hover:border-indigo-200 transition-colors relative group ${day.getMonth() !== currentDate.getMonth() ? 'opacity-50' : ''}`}>
+                                 <div className={`text-xs font-bold mb-2 ${isToday ? 'bg-indigo-600 text-white w-6 h-6 flex items-center justify-center rounded-full' : 'text-slate-500'}`}>{day.getDate()}</div>
+                                 <div className="space-y-1">
+                                     {items.map((item, idx) => (
+                                         <button key={idx} onClick={() => handleOpenViewItem(item, dateStr)} className={`w-full text-left text-[10px] px-1.5 py-1 rounded border truncate ${item.type === 'program_workout' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : item.type === 'client_workout' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                                            {item.type === 'exercise' ? getExerciseName(item.meta.exerciseId) : item.data.title}
+                                         </button>
+                                     ))}
+                                 </div>
+                                 <button onClick={() => handleOpenAssignModal(dateStr, 'workout')} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded"><Plus size={14} /></button>
+                             </div>
+                         );
+                     })}
+                 </div>
             </div>
         )}
+      </>
+  );
 
-        {/* RICH EDIT PROFILE MODAL */}
-        {showEditProfileModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                    <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                        <div>
-                            <h3 className="text-xl font-bold text-slate-800">Edit Client Profile</h3>
-                            <p className="text-xs text-slate-500">Detailed info helps AI make safer recommendations.</p>
-                        </div>
-                        <button onClick={() => setShowEditProfileModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
-                    </div>
-                    <div className="p-6 overflow-y-auto">
-                        <div className="space-y-8">
-                            {/* Section 1: Core */}
-                            <div>
-                                <h4 className="text-sm font-bold text-indigo-700 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><User size={16}/> Core Metrics</h4>
-                                <div className="mb-4">
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">Primary Goal</label>
-                                    <input type="text" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.goal || ''} onChange={e => setEditProfileData({...editProfileData, goal: e.target.value})} />
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Age</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.age || ''} onChange={e => setEditProfileData({...editProfileData, age: parseInt(e.target.value)})} /></div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-1">Gender</label>
-                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.gender || ''} onChange={e => setEditProfileData({...editProfileData, gender: e.target.value})}>
-                                            <option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
-                                        </select>
-                                    </div>
-                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Height (cm)</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.height || ''} onChange={e => setEditProfileData({...editProfileData, height: parseInt(e.target.value)})} /></div>
-                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Weight (kg)</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.weight || ''} onChange={e => setEditProfileData({...editProfileData, weight: parseInt(e.target.value)})} /></div>
-                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Body Fat (%)</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.bodyFat || ''} onChange={e => setEditProfileData({...editProfileData, bodyFat: parseInt(e.target.value)})} /></div>
-                                    <div className="md:col-span-1">
-                                        <label className="block text-xs font-medium text-slate-700 mb-1">Experience Level</label>
-                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.experienceLevel || 'Beginner'} onChange={e => setEditProfileData({...editProfileData, experienceLevel: e.target.value as any})}>
-                                            <option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 2: Health & Safety */}
-                            <div>
-                                <h4 className="text-sm font-bold text-red-600 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><HeartPulse size={16}/> Health & Safety</h4>
-                                <div className="space-y-4">
-                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Injuries (Comma separated)</label><input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. Rotator cuff, ACL tear" value={editProfileData.injuries ? editProfileData.injuries.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, injuries: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} /></div>
-                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Orthopedic Issues (e.g. Back Pain, Knee Pain)</label><input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. Lower back stiffness, Knee crepitus" value={editProfileData.orthopedicIssues ? editProfileData.orthopedicIssues.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, orthopedicIssues: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} /></div>
-                                    <div><label className="block text-xs font-medium text-slate-700 mb-1">Medical Conditions</label><input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. Diabetes, Asthma, High BP" value={editProfileData.medicalConditions ? editProfileData.medicalConditions.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, medicalConditions: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} /></div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div><label className="block text-xs font-medium text-slate-700 mb-1">Surgeries</label><input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="Year and type..." value={editProfileData.surgeries || ''} onChange={e => setEditProfileData({...editProfileData, surgeries: e.target.value})} /></div>
-                                        <div><label className="block text-xs font-medium text-slate-700 mb-1">Medications</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.medications || ''} onChange={e => setEditProfileData({...editProfileData, medications: e.target.value})} /></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 3: Lifestyle & Behavior */}
-                            <div>
-                                <h4 className="text-sm font-bold text-purple-600 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><Brain size={16}/> Lifestyle & Behavior</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-1">Stress Level</label>
-                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.stressLevel || 'Medium'} onChange={e => setEditProfileData({...editProfileData, stressLevel: e.target.value as any})}>
-                                            <option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-1">Sleep Quality</label>
-                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.sleepQuality || 'Fair'} onChange={e => setEditProfileData({...editProfileData, sleepQuality: e.target.value as any})}>
-                                            <option value="Poor">Poor</option><option value="Fair">Fair</option><option value="Good">Good</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-1">Environment Pref</label>
-                                        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={editProfileData.environmentPreference || 'Gym'} onChange={e => setEditProfileData({...editProfileData, environmentPreference: e.target.value as any})}>
-                                            <option value="Gym">Gym</option><option value="Home">Home</option><option value="Outdoor">Outdoor</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-1">Training Frequency</label>
-                                        <input type="number" min="1" max="7" className="w-full p-2 border rounded-lg text-sm" value={editProfileData.trainingDaysPerWeek || 3} onChange={e => setEditProfileData({...editProfileData, trainingDaysPerWeek: parseInt(e.target.value)})} />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">Training Styles (Comma separated)</label>
-                                    <input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. HIIT, Bodyweight, Yoga" value={editProfileData.trainingStylePreference ? editProfileData.trainingStylePreference.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, trainingStylePreference: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} />
-                                </div>
-                                <div className="mt-4">
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">Equipment Access</label>
-                                    <input type="text" className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. Gym, Dumbbells, Bands" value={editProfileData.equipmentAccess ? editProfileData.equipmentAccess.join(', ') : ''} onChange={e => setEditProfileData({...editProfileData, equipmentAccess: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                        <button onClick={() => setShowEditProfileModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cancel</button>
-                        <button onClick={handleSaveProfile} className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700">Save Profile</button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* MODAL: Assign Program (WITH AI) */}
-        {showAssignProgramModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                        <h3 className="text-xl font-bold text-slate-800">Assign Core Program</h3>
-                        <button onClick={() => setShowAssignProgramModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
-                    </div>
-                    <div className="p-6 max-h-[70vh] overflow-y-auto">
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Start Date</label>
-                            <input 
-                                type="date" 
-                                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                value={programStartDateInput}
-                                onChange={(e) => setProgramStartDateInput(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-3">
-                            {programs.map(prog => {
-                                return (
-                                    <button 
-                                        key={prog.id}
-                                        onClick={() => handleAssignProgram(prog.id)}
-                                        className={`w-full text-left p-4 rounded-xl border transition-all flex justify-between items-center group ${selectedClient.assignedProgramId === prog.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300 hover:shadow-md'}`}
-                                    >
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <h4 className={`font-bold ${selectedClient.assignedProgramId === prog.id ? 'text-indigo-700' : 'text-slate-800'}`}>{prog.title}</h4>
-                                            </div>
-                                            <p className="text-xs text-slate-500 mt-1">{prog.durationWeeks} Weeks • {prog.description}</p>
-                                        </div>
-                                        {selectedClient.assignedProgramId === prog.id && <span className="bg-indigo-600 text-white text-xs px-2 py-1 rounded font-medium">Current</span>}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* Assign Exercise Modal (reuse existing) */}
-        {showAssignModal && (
-             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"><div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"><div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div><h3 className="text-lg font-bold text-slate-800">Add {assignType === 'exercise' ? 'Exercise' : 'Workout'}</h3><p className="text-xs text-slate-500">Assign specifically for {selectedDateForAssignment}.</p></div><button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button></div><div className="p-6 space-y-5"><div><label className="block text-sm font-medium text-slate-700 mb-1">Select {assignType === 'exercise' ? 'Exercise' : 'Workout Template'}</label><select className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}><option value="">-- Select --</option>{assignType === 'exercise' ? exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>) : workouts.map(wk => <option key={wk.id} value={wk.id}>{wk.title}</option>)}</select></div>{assignType === 'exercise' && (<div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-1">Sets</label><input type="number" className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={assignmentSets} onChange={(e) => setAssignmentSets(e.target.value)} /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Reps</label><input type="text" className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={assignmentReps} onChange={(e) => setAssignmentReps(e.target.value)} /></div></div>)}<div><label className="block text-sm font-medium text-slate-700 mb-1">Coach Notes</label><textarea className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-24 text-sm" placeholder="Instructions for this specific day..." value={assignmentNote} onChange={(e) => setAssignmentNote(e.target.value)}/></div></div><div className="p-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100"><button onClick={() => setShowAssignModal(false)} className="px-4 py-2 text-slate-600 text-sm font-medium hover:bg-slate-200 rounded-lg">Cancel</button><button onClick={handleConfirmAssignment} disabled={!selectedId} className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 shadow-sm">Add to Schedule</button></div></div></div>
-        )}
-      </div>
-    );
-  }
+  const renderListView = () => {
+      return (
+          <div className="space-y-6 animate-fade-in">
+              <div className="flex justify-between items-center">
+                  <div><h2 className="text-2xl font-bold text-slate-800">Clients</h2><p className="text-slate-500">Manage your roster.</p></div>
+                  <button onClick={() => setShowAddClientModal(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-md"><UserPlus size={18} /> Add Client</button>
+              </div>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} /><input type="text" placeholder="Search clients by name or email..." className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/></div></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredClients.map(client => (
+                      <div key={client.id} onClick={() => setSelectedClientId(client.id)} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md cursor-pointer group transition-all">
+                          <div className="flex justify-between items-start mb-4">
+                              <div className="flex items-center gap-3"><div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-lg">{client.name.charAt(0)}</div><div><h3 className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{client.name}</h3><p className="text-xs text-slate-500">{client.email}</p></div></div>
+                              <span className={`px-2 py-1 rounded text-xs font-bold ${client.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{client.status}</span>
+                          </div>
+                          <div className="space-y-2 text-sm text-slate-600 mb-4"><div className="flex justify-between"><span>Goal</span><span className="font-medium">{client.goal}</span></div><div className="flex justify-between"><span>Program</span><span className="font-medium">{programs.find(p=>p.id===client.assignedProgramId)?.title || '-'}</span></div><div className="flex justify-between"><span>Last Active</span><span className="font-medium">{client.lastActive}</span></div></div>
+                          <div className="pt-4 border-t border-slate-50 flex justify-between items-center"><span className="text-xs font-bold text-slate-400 uppercase tracking-wider">View Profile</span><ArrowRight size={16} className="text-slate-300 group-hover:text-indigo-600 transition-colors"/></div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      );
+  };
 
   return (
-    // List View Render (Unchanged)
-    <div className="space-y-6 animate-fade-in">
-      {/* ... List View Code ... */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><h2 className="text-2xl font-bold text-slate-800">Client Management</h2><p className="text-slate-500">Monitor progress and assign programs.</p></div><button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md shadow-indigo-200"><UserPlus size={18} /><span>Add Client</span></button></div>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-100"><div className="relative max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="Search clients..." className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div></div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 font-medium"><tr><th className="px-6 py-4">Name</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Current Goal</th><th className="px-6 py-4">Assigned Program</th><th className="px-6 py-4">Last Active</th><th className="px-6 py-4 text-right">Actions</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredClients.map((client) => (
-                <tr key={client.id} onClick={() => setSelectedClientId(client.id)} className="hover:bg-slate-50/80 transition-colors cursor-pointer group">
-                  <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">{client.name.charAt(0)}</div><div><p className="font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">{client.name}</p><p className="text-slate-500 text-xs">{client.email}</p></div></div></td>
-                  <td className="px-6 py-4"><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${client.status === 'Active' ? 'bg-green-100 text-green-700' : client.status === 'Pending' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}><span className={`w-1.5 h-1.5 rounded-full ${client.status === 'Active' ? 'bg-green-500' : client.status === 'Pending' ? 'bg-orange-500' : 'bg-slate-500'}`}></span>{client.status}</span></td>
-                  <td className="px-6 py-4 text-slate-600">{client.goal}</td>
-                  <td className="px-6 py-4">{client.assignedProgramId ? (<div className="flex items-center gap-2 text-indigo-600 font-medium bg-indigo-50 px-3 py-1 rounded-lg w-fit"><ShieldCheck size={14} />{programs.find(p => p.id === client.assignedProgramId)?.title || 'Unknown Program'}</div>) : <span className="text-slate-400 italic">None</span>}</td>
-                  <td className="px-6 py-4 text-slate-500">{client.lastActive}</td>
-                  <td className="px-6 py-4 text-right"><div className="flex items-center justify-end gap-2"><button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" onClick={(e) => { e.stopPropagation(); }}><Mail size={18} /></button><button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"><MoreHorizontal size={18} /></button></div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+      <>
+          <div className="space-y-6">
+              {selectedClient ? renderDetailView() : renderListView()}
+          </div>
+
+          {showAddClientModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 animate-in fade-in" onClick={() => setShowAddClientModal(false)}>
+                  <div className="bg-white rounded-2xl w-full max-w-4xl p-6 shadow-2xl overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                      <h3 className="text-xl font-bold text-slate-800 mb-6">Add New Client</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div className="space-y-4"><h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Identity</h4><div><label className="block text-sm font-bold text-slate-700 mb-1">Name</label><input type="text" className="w-full p-3 border rounded-lg bg-slate-50" value={newClientData.name} onChange={e => setNewClientData({...newClientData, name: e.target.value})} /></div><div><label className="block text-sm font-bold text-slate-700 mb-1">Email</label><input type="email" className="w-full p-3 border rounded-lg bg-slate-50" value={newClientData.email} onChange={e => setNewClientData({...newClientData, email: e.target.value})} /></div></div>
+                          <div className="space-y-4"><h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Physical Profile</h4><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-slate-700 mb-1">Age</label><input type="number" className="w-full p-3 border rounded-lg bg-slate-50" value={newClientData.age || ''} onChange={e => setNewClientData({...newClientData, age: parseInt(e.target.value)})} /></div><div><label className="block text-sm font-bold text-slate-700 mb-1">Gender</label><select className="w-full p-3 border rounded-lg bg-slate-50" value={newClientData.gender || ''} onChange={e => setNewClientData({...newClientData, gender: e.target.value})}><option value="">Select...</option><option>Male</option><option>Female</option></select></div></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-slate-700 mb-1">Height (cm)</label><input type="number" className="w-full p-3 border rounded-lg bg-slate-50" value={newClientData.height || ''} onChange={e => setNewClientData({...newClientData, height: parseInt(e.target.value)})} /></div><div><label className="block text-sm font-bold text-slate-700 mb-1">Weight (kg)</label><input type="number" className="w-full p-3 border rounded-lg bg-slate-50" value={newClientData.weight || ''} onChange={e => setNewClientData({...newClientData, weight: parseInt(e.target.value)})} /></div></div></div>
+                      </div>
+                      <div className="mt-8 pt-6 border-t border-slate-100"><h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Initial Assessment</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div><label className="block text-sm font-bold text-slate-700 mb-1">Primary Goal</label><select className="w-full p-3 border rounded-lg bg-slate-50" value={newClientData.goal} onChange={e => setNewClientData({...newClientData, goal: e.target.value})}>{goals.map(g => <option key={g} value={g}>{g}</option>)}</select></div><div><label className="block text-sm font-bold text-slate-700 mb-1">Experience Level</label><select className="w-full p-3 border rounded-lg bg-slate-50" value={newClientData.experienceLevel} onChange={e => setNewClientData({...newClientData, experienceLevel: e.target.value as any})}><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select></div><div className="md:col-span-2"><label className="block text-sm font-bold text-slate-700 mb-1">Known Injuries</label><input type="text" className="w-full p-3 border rounded-lg bg-slate-50" placeholder="e.g. Lower back pain, left knee..." value={newClientData.injuries ? newClientData.injuries.join(', ') : ''} onChange={e => setNewClientData({...newClientData, injuries: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})} /></div></div></div>
+                      <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-100"><button onClick={() => setShowAddClientModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancel</button><button onClick={handleAddNewClient} className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-md">Create Client Profile</button></div>
+                  </div>
+              </div>
+          )}
+
+          {showAddMeasurementModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 animate-in fade-in" onClick={() => setShowAddMeasurementModal(false)}>
+                  <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800">Log New Measurement</h3><button onClick={() => setShowAddMeasurementModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button></div>
+                      <div className="space-y-4">
+                          <div><label className="block text-sm font-bold text-slate-700 mb-1">Date</label><input type="date" className="w-full p-2 border rounded-lg bg-slate-50" value={newMeasurementData.date} onChange={e => setNewMeasurementData({...newMeasurementData, date: e.target.value})} /></div>
+                          <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-slate-700 mb-1">Weight (kg)</label><input type="number" className="w-full p-2 border rounded-lg" value={newMeasurementData.weight || ''} onChange={e => setNewMeasurementData({...newMeasurementData, weight: parseFloat(e.target.value)})} /></div><div><label className="block text-sm font-bold text-slate-700 mb-1">Body Fat (%)</label><input type="number" className="w-full p-2 border rounded-lg" value={newMeasurementData.bodyFat || ''} onChange={e => setNewMeasurementData({...newMeasurementData, bodyFat: parseFloat(e.target.value)})} /></div></div>
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-4">Tape Measurements (cm)</h4>
+                          <div className="grid grid-cols-3 gap-4"><div><label className="block text-xs font-medium text-slate-600 mb-1">Chest</label><input type="number" className="w-full p-2 border rounded-lg" value={newMeasurementData.chest || ''} onChange={e => setNewMeasurementData({...newMeasurementData, chest: parseFloat(e.target.value)})} /></div><div><label className="block text-xs font-medium text-slate-600 mb-1">Waist</label><input type="number" className="w-full p-2 border rounded-lg" value={newMeasurementData.waist || ''} onChange={e => setNewMeasurementData({...newMeasurementData, waist: parseFloat(e.target.value)})} /></div><div><label className="block text-xs font-medium text-slate-600 mb-1">Hips</label><input type="number" className="w-full p-2 border rounded-lg" value={newMeasurementData.hips || ''} onChange={e => setNewMeasurementData({...newMeasurementData, hips: parseFloat(e.target.value)})} /></div></div>
+                          <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-medium text-slate-600 mb-1">Left Arm</label><input type="number" className="w-full p-2 border rounded-lg" value={newMeasurementData.armLeft || ''} onChange={e => setNewMeasurementData({...newMeasurementData, armLeft: parseFloat(e.target.value)})} /></div><div><label className="block text-xs font-medium text-slate-600 mb-1">Right Arm</label><input type="number" className="w-full p-2 border rounded-lg" value={newMeasurementData.armRight || ''} onChange={e => setNewMeasurementData({...newMeasurementData, armRight: parseFloat(e.target.value)})} /></div><div><label className="block text-xs font-medium text-slate-600 mb-1">Left Thigh</label><input type="number" className="w-full p-2 border rounded-lg" value={newMeasurementData.thighLeft || ''} onChange={e => setNewMeasurementData({...newMeasurementData, thighLeft: parseFloat(e.target.value)})} /></div><div><label className="block text-xs font-medium text-slate-600 mb-1">Right Thigh</label><input type="number" className="w-full p-2 border rounded-lg" value={newMeasurementData.thighRight || ''} onChange={e => setNewMeasurementData({...newMeasurementData, thighRight: parseFloat(e.target.value)})} /></div></div>
+                      </div>
+                      <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-100"><button onClick={() => setShowAddMeasurementModal(false)} className="px-6 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancel</button><button onClick={handleAddMeasurement} className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-bold shadow-md">Add Entry</button></div>
+                  </div>
+              </div>
+          )}
+
+          {showAssignProgramModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 animate-in fade-in" onClick={() => setShowAssignProgramModal(false)}>
+                  <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800">Assign Program</h3><button onClick={() => setShowAssignProgramModal(false)}><X size={24} className="text-slate-400"/></button></div>
+                      <div className="mb-4"><label className="block text-sm font-bold text-slate-700 mb-1">Start Date</label><input type="date" className="w-full p-2 border rounded-lg" value={programStartDateInput} onChange={e => setProgramStartDateInput(e.target.value)} /></div>
+                      <div className="flex-1 overflow-y-auto space-y-3">
+                          {programs.map(p => (
+                              <div key={p.id} onClick={() => handleAssignProgram(p.id)} className="p-4 border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 cursor-pointer transition-all">
+                                  <div className="flex justify-between items-center"><h4 className="font-bold text-slate-800">{p.title}</h4><span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{p.durationWeeks} Weeks</span></div>
+                                  <p className="text-sm text-slate-500 mt-1">{p.description}</p>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+          )}
+
+          {showAssignModal && (
+               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 animate-in fade-in" onClick={() => setShowAssignModal(false)}>
+                  <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800">Assign to {selectedDateForAssignment}</h3><button onClick={() => setShowAssignModal(false)}><X size={24} className="text-slate-400"/></button></div>
+                      <div className="flex border-b border-slate-100 mb-4"><button onClick={() => setAssignType('workout')} className={`flex-1 py-2 text-sm font-bold border-b-2 ${assignType === 'workout' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Workout</button><button onClick={() => setAssignType('exercise')} className={`flex-1 py-2 text-sm font-bold border-b-2 ${assignType === 'exercise' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Single Exercise</button></div>
+                      <div className="space-y-4 mb-6">
+                          <label className="block text-sm font-bold text-slate-700">Select Item</label>
+                          <select className="w-full p-2 border rounded-lg" value={selectedId} onChange={e => setSelectedId(e.target.value)}><option value="">-- Select --</option>{assignType === 'workout' ? workouts.map(w => <option key={w.id} value={w.id}>{w.title}</option>) : exercises.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
+                          {assignType === 'exercise' && (<div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sets</label><input type="number" className="w-full p-2 border rounded-lg" value={assignmentSets} onChange={e => setAssignmentSets(e.target.value)}/></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Reps</label><input type="text" className="w-full p-2 border rounded-lg" value={assignmentReps} onChange={e => setAssignmentReps(e.target.value)}/></div></div>)}
+                          <div><label className="block text-sm font-bold text-slate-700 mb-1">Notes</label><textarea className="w-full p-2 border rounded-lg h-20 resize-none" value={assignmentNote} onChange={e => setAssignmentNote(e.target.value)}></textarea></div>
+                      </div>
+                      <button onClick={handleConfirmAssignment} disabled={!selectedId} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50">Confirm Assignment</button>
+                  </div>
+               </div>
+          )}
+
+          {viewingItem && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 animate-in fade-in" onClick={() => setViewingItem(null)}>
+                  <div className="bg-white rounded-2xl w-full max-w-4xl p-6 shadow-2xl flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-between items-center mb-6">
+                        <div>
+                          <h3 className="text-xl font-bold text-slate-800">
+                            {viewingItem.item.type === 'exercise' ? getExerciseName(viewingItem.item.meta.exerciseId) : viewingItem.item.data.title}
+                          </h3>
+                          <p className="text-sm text-slate-500">{viewingItem.date}</p>
+                        </div>
+                        <button onClick={() => setViewingItem(null)}><X size={24} className="text-slate-400"/></button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto mb-6">
+                          {isEditingWorkout ? (
+                              <div className="space-y-4"><textarea className="w-full p-3 border rounded-lg bg-slate-50" placeholder="Session notes..." value={editedNotes} onChange={(e) => setEditedNotes(e.target.value)} /><div className="space-y-3">{editedExercises.map((ex, i) => (<div key={i} className="p-3 border rounded-lg bg-slate-50 flex justify-between items-center"><span className="font-bold text-sm">{getExerciseName(ex.exerciseId)}</span><div className="flex gap-2"><input type="number" className="w-12 p-1 border rounded text-center text-xs" value={ex.sets} onChange={(e) => { const newExs = [...editedExercises]; newExs[i].sets = parseInt(e.target.value); setEditedExercises(newExs); }} /><span className="text-xs py-1">sets</span><input type="text" className="w-12 p-1 border rounded text-center text-xs" value={ex.reps} onChange={(e) => { const newExs = [...editedExercises]; newExs[i].reps = e.target.value; setEditedExercises(newExs); }} /><span className="text-xs py-1">reps</span></div></div>))}</div></div>
+                          ) : (
+                              <div className="space-y-4">
+                                  {viewingItem.item.type === 'client_workout' && viewingItem.item.data.notes && <div className="p-3 bg-yellow-50 text-yellow-800 text-sm rounded-lg italic">"{viewingItem.item.data.notes}"</div>}
+                                  <div className="space-y-2">
+                                      {(viewingItem.item.type === 'program_workout' || viewingItem.item.type === 'client_workout') ? (
+                                          (isEditingWorkout ? editedExercises : viewingItem.item.data.exercises).map((ex, i) => (
+                                              <div key={i} className="flex justify-between p-3 border-b border-slate-50 last:border-0"><span className="font-medium text-slate-700">{getExerciseName(ex.exerciseId)}</span><span className="text-slate-500 text-sm">{ex.sets} x {ex.reps}</span></div>
+                                          ))
+                                      ) : (
+                                          <div className="p-4 bg-slate-50 rounded-lg">
+                                            <div className="flex justify-between mb-2">
+                                                <span className="font-bold text-slate-700">Sets</span>
+                                                {/* Narrowing type: If not workout, must be exercise, so it has meta */}
+                                                <span>{(viewingItem.item as any).meta?.sets}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="font-bold text-slate-700">Reps</span>
+                                                <span>{(viewingItem.item as any).meta?.reps}</span>
+                                            </div>
+                                          </div>
+                                      )}
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+                      <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
+                          {isEditingWorkout ? (
+                              <><button onClick={() => setIsEditingWorkout(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button><button onClick={handleSaveWorkoutChanges} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save Changes</button></>
+                          ) : (
+                              <button onClick={() => setIsEditingWorkout(true)} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 flex items-center gap-2"><Edit2 size={16} /> Edit</button>
+                          )}
+                      </div>
+                  </div>
+              </div>
+          )}
+      </>
   );
 };
 

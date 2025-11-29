@@ -53,18 +53,21 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onSimulate
         {onSimulateClient && (
             <button 
                 onClick={onSimulateClient}
-                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white py-3 px-4 rounded-xl border border-white/10 hover:border-white/30 transition-all shadow-lg shadow-indigo-900/50 group relative overflow-hidden"
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white py-3 px-4 rounded-xl border border-white/10 hover:border-white/30 transition-all shadow-lg shadow-indigo-900/50 group relative overflow-hidden animate-pulse"
             >
                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                <Smartphone size={18} className="relative z-10 group-hover:scale-110 transition-transform animate-pulse"/>
+                <Smartphone size={18} className="relative z-10 group-hover:scale-110 transition-transform"/>
                 <span className="relative z-10 text-xs font-bold uppercase tracking-wide">Simulate Client App</span>
             </button>
         )}
 
         <div>
-            <button className="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white w-full hover:bg-slate-800 rounded-lg transition-colors text-sm">
-            <Settings size={18} />
-            <span>Settings</span>
+            <button 
+              onClick={() => onChangeView('settings')}
+              className={`flex items-center gap-3 px-4 py-2 w-full rounded-lg transition-colors text-sm ${currentView === 'settings' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+            >
+              <Settings size={18} />
+              <span>Settings</span>
             </button>
             <div className="mt-3 flex items-center gap-3 px-4 pt-3 border-t border-slate-800/50">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white shadow-md">
